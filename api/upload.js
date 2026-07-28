@@ -9,7 +9,7 @@
 //     on every single turn. Referencing a file_id keeps long conversations cheap.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { checkAndCountIp } from "./_limits.js";
+import { checkAndCountIp, requireUnlocked } from "./_limits.js";
 
 export const MAX_FILE_BYTES = 1024 * 1024; // 1MB per file
 export const MAX_FILES = 3;
@@ -65,6 +65,9 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
+
+  // Password gate — no unauthenticated uploads into our Files API account.
+  if (!requireUnlocked(req, res)) return;
 
   try {
     const ipCheck = await checkAndCountIp(req);

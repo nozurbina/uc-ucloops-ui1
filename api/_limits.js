@@ -25,6 +25,9 @@ const IP_WINDOW_SECONDS = IP_WINDOW_DAYS * 24 * 60 * 60;
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6h — long enough for a sitting
 export const COOKIE_NAME = "ucl_sess";
 
+const GATE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — type it once
+export const GATE_COOKIE_NAME = "ucl_gate";
+
 function secret() {
   const s = process.env.CHAT_SESSION_SECRET;
   if (!s) throw new Error("CHAT_SESSION_SECRET is not set");
@@ -87,11 +90,20 @@ export function readCookie(req, name) {
   return null;
 }
 
+// Append rather than assign: a single response may need to set both the gate
+// cookie and the session cookie, and res.setHeader("Set-Cookie", ...) replaces
+// any value already there, silently dropping one of them.
+function appendCookie(res, cookie) {
+  const existing = res.getHeader("Set-Cookie");
+  if (!existing) res.setHeader("Set-Cookie", [cookie]);
+  else res.setHeader("Set-Cookie", [...[].concat(existing), cookie]);
+}
+
 export function setSessionCookie(res, value) {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
   const secure = process.env.NODE_ENV === "production" ? " Secure;" : "";
-  res.setHeader(
-    "Set-Cookie",
+  appendCookie(
+    res,
     `${COOKIE_NAME}=${encodeURIComponent(value)}; Path=/; HttpOnly;${secure} SameSite=Lax; Max-Age=${maxAge}`,
   );
 }
@@ -103,6 +115,65 @@ export function resolveTurns(req, bodyToken) {
   const fromCookie = decodeToken(readCookie(req, COOKIE_NAME));
   const fromBody = decodeToken(bodyToken);
   return fromCookie.turns >= fromBody.turns ? fromCookie : fromBody;
+}
+
+// ---------------------------------------------------------------------------
+// Shared-password gate
+// ---------------------------------------------------------------------------
+//
+// A single password shared with whoever should be able to try the demo. The
+// point is not to be unbreakable — anyone holding the password can pass it on —
+// it's to stop automated scanners, which is the realistic threat to an
+// unauthenticated endpoint that proxies a paid model.
+//
+// If DEMO_PASSWORD isn't set the gate is OFF, so local development and any
+// existing deployment keep working unchanged.
+
+export function gateEnabled() {
+  return Boolean(process.env.DEMO_PASSWORD);
+}
+
+// The cookie holds a signature of the password rather than the password itself,
+// so a stolen cookie can't be turned back into the shared secret, and rotating
+// DEMO_PASSWORD invalidates every issued cookie automatically.
+function gateValue() {
+  return sign(`gate:${process.env.DEMO_PASSWORD}`);
+}
+
+export function checkPassword(candidate) {
+  if (!gateEnabled()) return true;
+  const a = Buffer.from(String(candidate ?? ""), "utf8");
+  const b = Buffer.from(String(process.env.DEMO_PASSWORD), "utf8");
+  // Length check first: timingSafeEqual throws on a length mismatch.
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+export function isUnlocked(req) {
+  if (!gateEnabled()) return true;
+  const cookie = readCookie(req, GATE_COOKIE_NAME);
+  if (!cookie) return false;
+  const a = Buffer.from(cookie, "utf8");
+  const b = Buffer.from(gateValue(), "utf8");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+export function setGateCookie(res) {
+  const maxAge = Math.floor(GATE_TTL_MS / 1000);
+  const secure = process.env.NODE_ENV === "production" ? " Secure;" : "";
+  appendCookie(
+    res,
+    `${GATE_COOKIE_NAME}=${encodeURIComponent(gateValue())}; Path=/; HttpOnly;${secure} SameSite=Lax; Max-Age=${maxAge}`,
+  );
+}
+
+/**
+ * Guard for the protected endpoints. Returns true if the request may proceed;
+ * otherwise writes a 401 and returns false.
+ */
+export function requireUnlocked(req, res) {
+  if (isUnlocked(req)) return true;
+  res.status(401).json({ error: "locked", locked: true });
+  return false;
 }
 
 // ---------------------------------------------------------------------------

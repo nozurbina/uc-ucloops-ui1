@@ -113,7 +113,126 @@ function AgentAvatar({ agent, size = 42, ring = true }) {
   );
 }
 
+function PasswordGate({ onUnlock }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e?.preventDefault();
+    if (!password.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not verify that password.");
+      onUnlock();
+    } catch (err) {
+      setError(err.message);
+      setPassword("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        ...THEME,
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--purple-deep)",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        padding: "1.5rem",
+      }}
+    >
+      <form
+        onSubmit={submit}
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          padding: "2rem",
+          width: "100%",
+          maxWidth: 420,
+          boxShadow: "0 12px 40px rgba(0,0,0,.3)",
+        }}
+      >
+        <img
+          src="/uc-logo.svg"
+          alt="Urbina Consulting"
+          style={{ height: 26, width: "auto", marginBottom: "1.25rem", filter: "invert(1)" }}
+        />
+        <h1 style={{ fontSize: "1.2rem", fontWeight: 700, margin: "0 0 .4rem", color: "var(--slate)" }}>
+          ucLoops Persona Simulator
+        </h1>
+        <p style={{ fontSize: ".88rem", color: "var(--text-muted)", margin: "0 0 1.25rem", lineHeight: 1.5 }}>
+          This demo is password-protected. Enter the password you were given to continue.
+        </p>
+
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          autoFocus
+          autoComplete="current-password"
+          style={{
+            width: "100%",
+            padding: ".7rem .9rem",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            fontSize: ".95rem",
+            fontFamily: "inherit",
+            outline: "none",
+            marginBottom: error ? ".5rem" : "1rem",
+          }}
+        />
+        {error && (
+          <div style={{ color: "#b91c1c", fontSize: ".82rem", marginBottom: "1rem" }}>{error}</div>
+        )}
+        <button
+          type="submit"
+          disabled={busy || !password.trim()}
+          style={{
+            width: "100%",
+            background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
+            color: "var(--purple-deep)",
+            border: "none",
+            borderRadius: 10,
+            padding: ".75rem",
+            fontWeight: 700,
+            fontSize: ".95rem",
+            cursor: busy || !password.trim() ? "default" : "pointer",
+            opacity: busy || !password.trim() ? 0.55 : 1,
+          }}
+        >
+          {busy ? "Checking…" : "Enter demo"}
+        </button>
+        <p style={{ fontSize: ".76rem", color: "var(--text-muted)", margin: "1rem 0 0", textAlign: "center" }}>
+          Need access? Contact{" "}
+          <a href="mailto:ucloops@urbinaconsulting.com" style={{ color: "var(--purple)" }}>
+            ucloops@urbinaconsulting.com
+          </a>
+        </p>
+      </form>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        input::placeholder { color: #9ca3af; }
+      `}</style>
+    </div>
+  );
+}
+
 export default function AgentChat() {
+  const [gate, setGate] = useState({ checked: false, locked: false });
   const [activeId, setActiveId] = useState(PERSONA_META[0].id);
   const [convos, setConvos] = useState(initialConvos);
   const [draft, setDraft] = useState("");
@@ -150,16 +269,39 @@ export default function AgentChat() {
     }
   }, [convo.messages.length, activeId, sending, convo.initializing]);
 
+  // Ask the server whether a password is required and whether this browser has
+  // already satisfied it (the gate cookie is httpOnly, so only the server knows).
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) {
+          setGate({ checked: true, locked: Boolean(d.gateEnabled) && !d.unlocked });
+        }
+      })
+      .catch(() => {
+        // If the check itself fails, don't hard-lock the UI — the API routes
+        // enforce the gate independently, so the worst case is a 401 later.
+        if (!cancelled) setGate({ checked: true, locked: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Real /initialize priming turn — runs once per agent, before any user
   // message, so the greeting is genuinely model-generated from the agent's own
   // template rather than a static placeholder. Hidden from the visible
   // transcript, but part of the history sent to the API on later turns.
   useEffect(() => {
+    // Wait for the gate check — priming while locked would just burn a 401.
+    if (!gate.checked || gate.locked) return;
     if (convo.initialized || convo.initializing || initStarted.current.has(activeId)) return;
     initStarted.current.add(activeId);
     runInitialize(activeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, convo.initialized, convo.initializing]);
+  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked]);
 
   async function runInitialize(agentId) {
     setConvos((prev) => ({ ...prev, [agentId]: { ...prev[agentId], initializing: true } }));
@@ -268,6 +410,12 @@ export default function AgentChat() {
         body: JSON.stringify({ agentId: activeId, messages: historyForApi, token: convo.token }),
       });
       const data = await res.json();
+      // Gate cookie expired or was cleared mid-session — send them back to the
+      // password screen rather than showing a bare error.
+      if (res.status === 401 && data.locked) {
+        setGate({ checked: true, locked: true });
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Request failed");
 
       setConvos((prev) => {
@@ -361,6 +509,40 @@ export default function AgentChat() {
   }
 
   const inputDisabled = sending || convo.initializing;
+
+  if (!gate.checked) {
+    return (
+      <div
+        style={{
+          ...THEME,
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--purple-deep)",
+          color: "rgba(255,255,255,.7)",
+          fontFamily: "'Inter', -apple-system, sans-serif",
+          fontSize: ".9rem",
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  if (gate.locked) {
+    return (
+      <PasswordGate
+        onUnlock={() => {
+          setGate({ checked: true, locked: false });
+          // Clear any half-started priming so each agent re-initialises cleanly
+          // now that requests will actually be authorised.
+          initStarted.current.clear();
+          setConvos(initialConvos());
+        }}
+      />
+    );
+  }
 
   return (
     <div

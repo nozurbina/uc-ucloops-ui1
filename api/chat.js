@@ -6,6 +6,7 @@ import {
   resolveTurns,
   setSessionCookie,
   checkAndCountIp,
+  requireUnlocked,
   IP_WINDOW_DAYS,
 } from "./_limits.js";
 import { MAX_FILES } from "./upload.js";
@@ -110,6 +111,9 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
+
+  // Password gate — a scanner that finds this endpoint gets a 401, not tokens.
+  if (!requireUnlocked(req, res)) return;
 
   try {
     const { agentId, messages, token, init } = req.body ?? {};
