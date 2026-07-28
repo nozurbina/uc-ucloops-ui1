@@ -10,6 +10,15 @@ const MAX_HISTORY_MESSAGES = 40; // hard cap on what a client can send us
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// The persona master template defines slash-commands like /initialize and
+// /help for tools that have a command router. This app doesn't — it's
+// direct Q&A only — so make that explicit, otherwise the model sometimes
+// echoes a literal command name instead of just answering in character.
+const CHAT_MODE_ADDENDUM = `
+
+---
+You are already mid-conversation with a researcher in a live chat interface. There is no command router here — do NOT run /initialize, /help, or any other named skill unless the user's message literally contains that exact command. For every normal message, just answer naturally and fully in character based on everything above. Never output a bare command name (like "/initialize") as your response.`;
+
 function sign(payload) {
   const secret = process.env.CHAT_SESSION_SECRET;
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -97,7 +106,7 @@ export default async function handler(req, res) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
-      system: persona.description,
+      system: persona.description + CHAT_MODE_ADDENDUM,
       messages: cleanMessages,
     });
 
