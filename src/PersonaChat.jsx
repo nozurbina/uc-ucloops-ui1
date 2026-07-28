@@ -31,7 +31,15 @@ const sourceChipStyle = {
 };
 
 function emptyConvo() {
-  return { messages: [], token: null, turnsUsed: 0, turnsMax: 15, limitReached: false };
+  return {
+    messages: [],
+    token: null,
+    turnsUsed: 0,
+    turnsMax: 15,
+    limitReached: false,
+    initialized: false,
+    initializing: false,
+  };
 }
 
 export default function PersonaChat() {
@@ -44,6 +52,7 @@ export default function PersonaChat() {
   const [error, setError] = useState(null);
   const [showSources, setShowSources] = useState(false);
   const scrollRef = useRef(null);
+  const initStarted = useRef(new Set());
 
   const active = PERSONA_META.find((p) => p.id === activeId);
   const convo = convos[activeId];
@@ -53,11 +62,56 @@ export default function PersonaChat() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [convo.messages.length, activeId, sending]);
+  }, [convo.messages.length, activeId, sending, convo.initializing]);
+
+  // Real /initialize priming turn — runs once per persona, before any user
+  // message, so the persona's own greeting is genuinely model-generated
+  // rather than a static placeholder. Hidden from the transcript, but part
+  // of the real message history sent to the API on later turns.
+  useEffect(() => {
+    if (convo.initialized || convo.initializing || initStarted.current.has(activeId)) return;
+    initStarted.current.add(activeId);
+    runInitialize(activeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, convo.initialized, convo.initializing]);
+
+  async function runInitialize(personaId) {
+    setConvos((prev) => ({ ...prev, [personaId]: { ...prev[personaId], initializing: true } }));
+
+    const initMsg = { role: "user", content: "/initialize", hidden: true };
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personaId, messages: [initMsg], init: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+
+      setConvos((prev) => ({
+        ...prev,
+        [personaId]: {
+          ...prev[personaId],
+          messages: [initMsg, { role: "assistant", content: data.reply }],
+          token: data.token ?? prev[personaId].token,
+          initialized: true,
+          initializing: false,
+        },
+      }));
+    } catch (e) {
+      // Non-fatal — fall back to a static opener so the user can still chat;
+      // the model will still have full context on their first real message.
+      setConvos((prev) => ({
+        ...prev,
+        [personaId]: { ...prev[personaId], initialized: true, initializing: false },
+      }));
+    }
+  }
 
   async function send() {
     const text = draft.trim();
-    if (!text || sending || convo.limitReached) return;
+    if (!text || sending || convo.limitReached || convo.initializing) return;
     setError(null);
     setDraft("");
 
@@ -91,6 +145,7 @@ export default function PersonaChat() {
         return {
           ...prev,
           [activeId]: {
+            ...prevConvo,
             messages: nextMessages,
             token: data.token ?? prevConvo.token,
             turnsUsed: data.turnsUsed ?? prevConvo.turnsUsed,
@@ -107,6 +162,7 @@ export default function PersonaChat() {
   }
 
   function resetConversation() {
+    initStarted.current.delete(activeId);
     setConvos((prev) => ({ ...prev, [activeId]: emptyConvo() }));
     setError(null);
   }
@@ -215,7 +271,7 @@ export default function PersonaChat() {
                   >
                     {p.role}
                   </div>
-                  {c.messages.length > 0 && (
+                  {c.turnsUsed > 0 && (
                     <div style={{ fontSize: ".65rem", color: "var(--gold-bright)", marginTop: 2 }}>
                       {c.turnsUsed}/{c.turnsMax} messages
                     </div>
@@ -331,7 +387,7 @@ export default function PersonaChat() {
         )}
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
-          {convo.messages.length === 0 && (
+          {convo.initializing && (
             <div
               style={{
                 maxWidth: 520,
@@ -347,13 +403,12 @@ export default function PersonaChat() {
                 alt={active.name}
                 style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", margin: "0 auto 1rem" }}
               />
-              Start a conversation with <strong>{active.name}</strong> — {active.role.toLowerCase()}.
-              Every answer is grounded in real BorderBlend interview research.
+              Getting to know {active.name}…
             </div>
           )}
 
           <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {convo.messages.map((m, i) => (
+            {convo.messages.filter((m) => !m.hidden).map((m, i) => (
               <div
                 key={i}
                 style={{
@@ -456,9 +511,9 @@ export default function PersonaChat() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={`Message ${active.name}…`}
+                  placeholder={convo.initializing ? `${active.name} is getting ready…` : `Message ${active.name}…`}
                   rows={1}
-                  disabled={sending}
+                  disabled={sending || convo.initializing}
                   style={{
                     flex: 1,
                     resize: "none",
@@ -473,7 +528,7 @@ export default function PersonaChat() {
                 />
                 <button
                   onClick={send}
-                  disabled={sending || !draft.trim()}
+                  disabled={sending || !draft.trim() || convo.initializing}
                   style={{
                     background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
                     color: "var(--purple-deep)",
@@ -482,8 +537,8 @@ export default function PersonaChat() {
                     padding: ".7rem 1.4rem",
                     fontWeight: 700,
                     fontSize: ".9rem",
-                    cursor: sending || !draft.trim() ? "default" : "pointer",
-                    opacity: sending || !draft.trim() ? 0.55 : 1,
+                    cursor: sending || !draft.trim() || convo.initializing ? "default" : "pointer",
+                    opacity: sending || !draft.trim() || convo.initializing ? 0.55 : 1,
                     flexShrink: 0,
                   }}
                 >

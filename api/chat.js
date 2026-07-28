@@ -10,14 +10,15 @@ const MAX_HISTORY_MESSAGES = 40; // hard cap on what a client can send us
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// The persona master template defines slash-commands like /initialize and
-// /help for tools that have a command router. This app doesn't — it's
-// direct Q&A only — so make that explicit, otherwise the model sometimes
-// echoes a literal command name instead of just answering in character.
+// Skills like /initialize are meant to actually run — /initialize as a real
+// internal first turn (see the "init" request flag below) so the persona
+// template's context genuinely primes the model before any real Q&A. The
+// bug this fixes: the model was outputting the bare token "/initialize"
+// instead of producing that skill's defined greeting content.
 const CHAT_MODE_ADDENDUM = `
 
 ---
-You are already mid-conversation with a researcher in a live chat interface. There is no command router here — do NOT run /initialize, /help, or any other named skill unless the user's message literally contains that exact command. For every normal message, just answer naturally and fully in character based on everything above. Never output a bare command name (like "/initialize") as your response.`;
+Skills such as /initialize and /help can be triggered either by the user typing that exact command, or by the app itself invoking it internally — for example, the very first turn of a brand-new conversation is always an internal /initialize call. Either way, when a skill is triggered, produce that skill's actual defined output directly. Never respond with just the bare command name/token (e.g. the literal text "/initialize") — that name is an internal trigger label, not something to say to the user.`;
 
 function sign(payload) {
   const secret = process.env.CHAT_SESSION_SECRET;
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { personaId, messages, token } = req.body ?? {};
+    const { personaId, messages, token, init } = req.body ?? {};
 
     const persona = PERSONAS.find((p) => p.id === personaId);
     if (!persona) {
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
 
     const { turns } = decodeToken(token);
 
-    if (turns >= MAX_TURNS) {
+    if (!init && turns >= MAX_TURNS) {
       res.status(200).json({
         limitReached: true,
         reply:
@@ -113,7 +114,9 @@ export default async function handler(req, res) {
     const textBlock = response.content.find((b) => b.type === "text");
     const reply = textBlock ? textBlock.text : "";
 
-    const newTurns = turns + 1;
+    // The /initialize priming turn doesn't consume the user's message
+    // budget — it's app-triggered context-setting, not a real exchange.
+    const newTurns = init ? turns : turns + 1;
     res.status(200).json({
       reply,
       token: encodeToken(newTurns),
