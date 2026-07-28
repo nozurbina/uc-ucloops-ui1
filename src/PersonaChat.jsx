@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PERSONA_META, sourceWordTotal } from "./personaMeta.js";
+
+const EVIDENCE_MAP_URL = "https://urbinaconsulting.com/shares/ucloops/borderblend/";
 
 const THEME = {
   "--purple-deep": "#500850",
@@ -175,7 +179,58 @@ export default function PersonaChat() {
   }
 
   return (
-    <div style={{ ...THEME, display: "flex", height: "100vh", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "var(--bg)" }}>
+    <div style={{ ...THEME, display: "flex", flexDirection: "column", height: "100vh", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "var(--bg)" }}>
+      <div
+        style={{
+          background: "var(--slate)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: ".6rem",
+          padding: ".4rem .7rem",
+          boxShadow: "0 3px 10px rgba(0,0,0,.18)",
+          flexShrink: 0,
+          zIndex: 10,
+        }}
+      >
+        <a
+          href={EVIDENCE_MAP_URL}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            color: "#cdd7e0",
+            textDecoration: "none",
+            fontSize: ".82rem",
+            fontWeight: 600,
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: ".4rem",
+          }}
+        >
+          <span>←</span>
+          <span>Back to BorderBlend Evidence Map</span>
+        </a>
+        <button
+          onClick={() => setShowSources((v) => !v)}
+          style={{
+            background: "var(--amber)",
+            color: "var(--slate)",
+            border: "none",
+            borderRadius: 6,
+            padding: ".32rem .7rem",
+            fontSize: ".74rem",
+            fontWeight: 700,
+            cursor: "pointer",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Sources &amp; evidence {showSources ? "▲" : "▼"}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
       <aside
         style={{
           width: 280,
@@ -302,21 +357,6 @@ export default function PersonaChat() {
           </div>
           <div style={{ display: "flex", gap: ".6rem", flexShrink: 0 }}>
             <button
-              onClick={() => setShowSources((v) => !v)}
-              style={{
-                background: showSources ? "var(--gold)" : "rgba(255,255,255,.12)",
-                border: "1px solid rgba(255,255,255,.3)",
-                color: showSources ? "var(--purple-deep)" : "#fff",
-                borderRadius: 999,
-                padding: ".4rem 1rem",
-                fontSize: ".78rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Sources &amp; evidence {showSources ? "▲" : "▼"}
-            </button>
-            <button
               onClick={resetConversation}
               style={{
                 background: "rgba(255,255,255,.12)",
@@ -347,7 +387,7 @@ export default function PersonaChat() {
           >
             <div style={{ maxWidth: 720, margin: "0 auto" }}>
               <p style={{ margin: "0 0 .6rem", fontWeight: 600 }}>
-                {active.name} is grounded in {active.sources.length} real interview
+                {active.name} is grounded in {active.sources.length} interview
                 {active.sources.length === 1 ? "" : "s"} (~{wordTotal.toLocaleString()} words of verbatim
                 research), plus the full BorderBlend {active.journeyLabel ? "persona profile and journey map" : "persona profile"}.
               </p>
@@ -425,6 +465,7 @@ export default function PersonaChat() {
                   />
                 )}
                 <div
+                  className={m.role === "user" ? "bubble-user" : "bubble-assistant"}
                   style={{
                     maxWidth: "75%",
                     padding: ".7rem 1rem",
@@ -434,11 +475,12 @@ export default function PersonaChat() {
                     border: m.role === "user" ? "none" : "1px solid var(--border)",
                     fontSize: ".92rem",
                     lineHeight: 1.55,
-                    whiteSpace: "pre-wrap",
                     boxShadow: m.role === "user" ? "none" : "0 1px 3px rgba(0,0,0,.05)",
                   }}
                 >
-                  {m.content}
+                  <div className="md-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                  </div>
                 </div>
               </div>
             ))}
@@ -552,11 +594,26 @@ export default function PersonaChat() {
           </div>
         </div>
       </main>
+      </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         textarea::placeholder { color: #9ca3af; }
+        .md-content { min-width: 0; }
+        .md-content > *:first-child { margin-top: 0; }
+        .md-content > *:last-child { margin-bottom: 0; }
+        .md-content h1, .md-content h2, .md-content h3 {
+          font-size: .95rem; font-weight: 700; margin: .9rem 0 .4rem; color: inherit;
+        }
+        .md-content hr { border: none; border-top: 1px solid rgba(0,0,0,.12); margin: .8rem 0; }
+        .md-content p { margin: 0 0 .6rem; }
+        .md-content ul, .md-content ol { margin: 0 0 .6rem; padding-left: 1.2rem; }
+        .md-content li { margin-bottom: .25rem; }
+        .md-content strong { font-weight: 700; }
+        .md-content code { background: rgba(0,0,0,.06); padding: .1rem .3rem; border-radius: 4px; font-size: .85em; }
+        .md-content a { color: var(--gold); font-weight: 600; text-decoration: underline; }
+        .bubble-user .md-content a { color: var(--gold-bright); }
       `}</style>
     </div>
   );

@@ -20,6 +20,16 @@ const CHAT_MODE_ADDENDUM = `
 ---
 Skills such as /initialize and /help can be triggered either by the user typing that exact command, or by the app itself invoking it internally — for example, the very first turn of a brand-new conversation is always an internal /initialize call. Either way, when a skill is triggered, produce that skill's actual defined output directly. Never respond with just the bare command name/token (e.g. the literal text "/initialize") — that name is an internal trigger label, not something to say to the user.`;
 
+// Only applied on the internal /initialize call. The master template chains
+// /initialize straight into /help's full skill listing, which reads as
+// unprompted info-dump in a plain chat UI (this app has no slash-command
+// affordance, just a text box) — stop after the greeting and let the user
+// actually ask before dumping the skills menu.
+const INIT_ADDENDUM = `
+
+---
+For this specific /initialize call: stop after your greeting and "About me" blurb. Do NOT automatically continue into /help or list your skills menu — just end with one short line mentioning that /help is available if they want to see it, then stop and wait for the user's next message.`;
+
 function sign(payload) {
   const secret = process.env.CHAT_SESSION_SECRET;
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -107,7 +117,7 @@ export default async function handler(req, res) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
-      system: persona.description + CHAT_MODE_ADDENDUM,
+      system: persona.description + CHAT_MODE_ADDENDUM + (init ? INIT_ADDENDUM : ""),
       messages: cleanMessages,
     });
 
