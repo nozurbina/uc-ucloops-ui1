@@ -1,5 +1,5 @@
-import PersonaChat from "./PersonaChat.jsx";
+import AgentChat from "./AgentChat.jsx";
 
 export default function App() {
-  return <PersonaChat />;
+  return <AgentChat />;
 }

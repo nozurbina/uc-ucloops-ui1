@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "templates": "node scripts/build-templates.mjs",
+    "prebuild": "node scripts/build-templates.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

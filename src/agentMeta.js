@@ -1,19 +1,21 @@
-// Lightweight, client-safe persona metadata for the picker UI + the
-// "Sources" transparency panel. The full system-prompt data (with complete
-// interview transcripts and journey-map content) lives in personas.js,
-// which is imported ONLY by the server-side /api/chat function — never
-// bundled into the client.
+// agentMeta.js
+// Lightweight, client-safe metadata for the agent picker, header, and sources
+// panel. The full system prompts (with complete interview transcripts) live in
+// personas.js / assistants.js, imported ONLY by the serverless functions —
+// never bundled into the browser.
 
 const SITE = "https://urbinaconsulting.com/shares/ucloops/borderblend";
 
 export const PERSONA_META = [
   {
     id: "omar",
+    type: "persona",
     name: "Omar",
     role: "Business Lunch — financial-district professional",
     detail: "Solo weekday lunch · Toronto · 34",
     avatar: "/headshots/omar.jpg",
     initial: "O",
+    maxTurns: 15,
     profileUrl: `${SITE}/persona-omar-v3.html`,
     journeyUrl: `${SITE}/journey-map-business-lunch-v3.html`,
     journeyLabel: "Business Lunch journey map",
@@ -24,11 +26,13 @@ export const PERSONA_META = [
   },
   {
     id: "grace",
+    type: "persona",
     name: "Grace",
     role: "Business Lunch — office manager & catering coordinator",
     detail: "Team lunch & catering · Calgary · 41",
     avatar: "/headshots/grace.jpg",
     initial: "G",
+    maxTurns: 15,
     profileUrl: `${SITE}/persona-grace-v3.html`,
     journeyUrl: `${SITE}/journey-map-business-lunch-v3.html`,
     journeyLabel: "Business Lunch journey map",
@@ -39,11 +43,13 @@ export const PERSONA_META = [
   },
   {
     id: "mateo",
+    type: "persona",
     name: "Mateo",
     role: "Late-Night Foodie — nightlife service worker",
     detail: "Toronto · 26",
     avatar: "/headshots/mateo.jpg",
     initial: "M",
+    maxTurns: 15,
     profileUrl: `${SITE}/persona-late-night-foodie-v3.html`,
     journeyUrl: `${SITE}/journey-map-late-night-v3.html`,
     journeyLabel: "Late-Night Foodie journey map",
@@ -54,11 +60,13 @@ export const PERSONA_META = [
   },
   {
     id: "diego",
+    type: "persona",
     name: "Diego",
     role: "Franchisee / Operator — multi-truck veteran",
     detail: "Toronto · 4 years running trucks",
     avatar: "/headshots/diego.jpg",
     initial: "D",
+    maxTurns: 15,
     profileUrl: `${SITE}/persona-franchisee-v3.html`,
     journeyUrl: null,
     journeyLabel: null,
@@ -74,11 +82,13 @@ export const PERSONA_META = [
   },
   {
     id: "tyler",
+    type: "persona",
     name: "Tyler",
     role: "Everyday 20-something — convenience-first eater",
     detail: "Vancouver · 24",
     avatar: "/headshots/tyler.jpg",
     initial: "T",
+    maxTurns: 15,
     profileUrl: `${SITE}/persona-everyday-20s-v3.html`,
     journeyUrl: null,
     journeyLabel: null,
@@ -89,6 +99,43 @@ export const PERSONA_META = [
   },
 ];
 
-export function sourceWordTotal(persona) {
-  return persona.sources.reduce((sum, s) => sum + s.words, 0);
+export const ASSISTANT_META = [
+  {
+    id: "ux",
+    type: "assistant",
+    name: "UX Assistant",
+    role: "Journeys, user stories, and ideation",
+    detail: "Experience & content design",
+    avatar: null,
+    initial: "UX",
+    accent: "#3131bf",
+    maxTurns: 25,
+    blurb:
+      "A seasoned UX and content designer. Builds journey outlines (including multi-persona ones), turns research into user stories, and works through design challenges with you.",
+    sources: [],
+  },
+  {
+    id: "data",
+    type: "assistant",
+    name: "Data Assistant",
+    role: "Research processing and persona synthesis",
+    detail: "Data analysis & synthesis",
+    avatar: null,
+    initial: "DA",
+    accent: "#0b6a5b",
+    maxTurns: 25,
+    blurb:
+      "An experienced data analyst. Cleans up raw transcripts, synthesises personas from research, and indexes datasets so findings stay traceable to their source.",
+    sources: [],
+  },
+];
+
+export const AGENT_META = [...PERSONA_META, ...ASSISTANT_META];
+
+export function getAgentMeta(id) {
+  return AGENT_META.find((a) => a.id === id);
+}
+
+export function sourceWordTotal(agent) {
+  return (agent.sources ?? []).reduce((sum, s) => sum + s.words, 0);
 }

@@ -1,51 +1,83 @@
 # ucLoops Persona Simulator
 
-Chat with the five BorderBlend research personas (Omar, Grace, Mateo, Diego, Tyler) — each one is Claude Haiku 4.5, grounded in the full verbatim interview transcripts behind that persona, roleplaying in first person per the ucLoops Persona Master Template.
+A free-demo chat interface for the ucLoops methodology, running on Claude Haiku 4.5:
+
+- **5 BorderBlend personas** (Omar, Grace, Mateo, Diego, Tyler) — each roleplays in first person, grounded in the full verbatim interview transcripts behind that persona, plus their journey-map stages where one exists.
+- **UX Assistant** — journey outlines (single and multi-persona), user stories, ideation.
+- **Data Assistant** — transcript cleanup, persona synthesis, dataset indexing.
 
 ## Architecture
 
 - **Frontend**: Vite + React, static build.
-- **Backend**: one Vercel serverless function (`api/chat.js`) that holds the Anthropic API key server-side and proxies chat requests. The browser never sees the key.
-- **Rate limiting**: each conversation is capped at 15 messages. The limit is enforced with a signed, stateless token (HMAC over a turn counter + expiry) round-tripped between client and server on every reply — no database needed, and it survives serverless cold starts. Tampering with the token just resets the conversation to 0 turns (equivalent to the user opening a new tab, which they could always do anyway).
-- **Cost cap**: `max_tokens` is hardcoded server-side (700) regardless of what the client sends.
+- **Backend**: two Vercel serverless functions — `api/chat.js` and `api/upload.js`. The Anthropic API key stays server-side; the browser never sees it.
+- **Templates as source of truth**: the agent behaviour specs live as markdown in `src/ucLoops-templates/`. `scripts/build-templates.mjs` compiles them into `src/templates.generated.js`, which both the agents and the serverless functions import. Edit a `.md`, re-run `npm run templates` (it also runs automatically on `npm run build`).
+
+### Demo limits
+
+| Limit | Value |
+|---|---|
+| Messages per conversation | 15 (personas) / 25 (assistants) |
+| Attachments per message | 3, 1MB each |
+| Per-IP cap | 60 model calls per rolling 3-day window *(only if Upstash is configured)* |
+| Output tokens per reply | 1200, hardcoded server-side |
+
+**Disabled skills.** Several methodology skills are marked `(DISABLED IN FREE DEMO)` in the templates — `/p-create-page`, `/j-create-page`, `/j-suggest`, `/j-data`, `/persona-export`, `/create-index`, `/clean-index`. The agents will still *describe* what these do and when you'd reach for them, but won't run them or produce their deliverables. They're listed in the Available Skills panel with a "Not in demo" badge.
+
+### How the abuse limits work, and what they don't do
+
+Three layers, because none alone is enough:
+
+1. **Signed session token** — tracks turns within one conversation; tamper-proof (HMAC).
+2. **httpOnly cookie** — carries that token so a plain page refresh doesn't reset the count. JS can't read or clear an httpOnly cookie. Zero infrastructure.
+3. **Per-IP counter** in Upstash Redis over a rolling 3-day window — the only layer that survives incognito or cleared storage.
+
+Layers 1 and 2 always work. Layer 3 activates only when the Upstash env vars are set, and **fails open** if the store is unreachable (a demo that breaks because Redis blipped is worse than one that briefly over-serves).
+
+**Be clear-eyed about the ceiling:** none of this stops someone determined with a VPN. Short of real accounts, nothing does. The actual backstop is a **hard spend limit on the API key** in the [Anthropic Console](https://console.anthropic.com/) — set one; it costs nothing and caps worst-case exposure regardless of any bug in the logic above.
 
 ## Local development
 
-You need two things running together — the Vite dev server and Vercel's local function runtime:
-
 ```bash
 npm install
-npm install -g vercel   # once, if you don't have it
-cp .env.local.example .env.local   # then fill in your real API key + a random secret
+npm install -g vercel                # once
+cp .env.local.example .env.local     # then fill in the values
 vercel dev
 ```
 
-`vercel dev` serves both the static frontend and `/api/chat` on one port (usually `http://localhost:3000`), so just open that — you don't need `npm run dev` separately once `vercel dev` is running.
+`vercel dev` serves the frontend and both API routes on one port (usually `http://localhost:3000`).
 
-## Deploying to Vercel
+> **Note:** once the project is linked to Vercel, `vercel dev` reads environment variables from the **cloud project**, not `.env.local` (you'll see `Ignoring .env.local` in `--debug` output). Set them with `vercel env add <NAME> development` — or in the dashboard — or the functions will start with no API key.
 
-1. Push this repo to GitHub (or run `vercel` from this folder to deploy directly without a git remote).
-2. In the Vercel dashboard, import the project.
-3. Under **Settings → Environment Variables**, add:
-   - `ANTHROPIC_API_KEY` — your real key
-   - `CHAT_SESSION_SECRET` — any long random string (`openssl rand -hex 32`)
-4. Deploy. Vercel auto-detects the Vite frontend and the `api/` folder as serverless functions — no extra config needed.
+## Deploying
 
-### Extra safety net (recommended, costs nothing to set up)
+1. Push to GitHub and import the project in Vercel (or run `vercel` from this folder).
+2. Under **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` and `CHAT_SESSION_SECRET` (and the two `UPSTASH_*` vars if you want the per-IP cap).
+3. Deploy. Vercel auto-detects the Vite frontend and the `api/` folder — no extra config.
 
-In the [Anthropic Console](https://console.anthropic.com/), set a hard spend limit on the API key used here. Even if there's ever a bug in the turn-limit logic, this caps worst-case cost at whatever you set.
+### Adding the per-IP cap (optional)
+
+1. Create a free Upstash Redis database (via the Vercel Marketplace integration or directly at upstash.com).
+2. Copy its **REST URL** and **REST token** into `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
+3. Redeploy. Tune `IP_TURN_CAP` and `IP_WINDOW_DAYS` at the top of `api/_limits.js`.
 
 ## Project structure
 
 ```
-api/chat.js          — the only backend code; holds the API key, enforces the message limit
-src/personas.js      — full persona system prompts + complete interview transcripts (server-side only, large file)
-src/personaMeta.js   — lightweight persona list for the UI (name, photo, role) — safe to ship to the browser
-src/PersonaChat.jsx  — the chat UI
-public/headshots/    — persona photos
-public/uc-logo.svg   — Urbina Consulting logo
+api/chat.js               — chat endpoint; holds the key, enforces turn limits, resolves attachments
+api/upload.js             — uploads an attachment to the Anthropic Files API, returns a file_id
+api/_limits.js            — signed tokens, httpOnly cookie, per-IP cap
+scripts/build-templates.mjs — compiles src/ucLoops-templates/*.md → src/templates.generated.js
+src/ucLoops-templates/    — the methodology templates (SOURCE OF TRUTH — edit these)
+src/personas.js           — persona system prompts + full transcripts (server-side only, large)
+src/assistants.js         — UX + Data assistant system prompts
+src/agents.js             — combined registry + per-agent turn limits
+src/skills.js             — client-safe skills catalogue with disabled flags
+src/agentMeta.js          — client-safe agent metadata (names, photos, sources)
+src/AgentChat.jsx         — the chat UI
 ```
 
-## Model & scope
+`personas.js`, `assistants.js`, and `agents.js` are imported **only** by the serverless functions — the full system prompts and interview transcripts never reach the browser. (`npm run build` then grepping `dist/assets/*.js` for template markers is a quick way to confirm this after changes.)
 
-Uses `claude-haiku-4-5` (cheap, fast — matches the low-stakes nature of a demo chat tool). To change models or the turn limit, edit the constants at the top of `api/chat.js`.
+## Changing the model or limits
+
+Model and output cap: top of `api/chat.js`. Turn limits: `src/agents.js`. Attachment limits: `api/upload.js` (server-authoritative) and the matching constants in `src/AgentChat.jsx` (client-side pre-check).
