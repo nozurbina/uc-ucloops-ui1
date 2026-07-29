@@ -209,6 +209,20 @@ export const WORKFLOW_CHAIN = {
   note: "/j-outline defines the stages → /j-stage fills each one in the persona's voice → /j-suggest and /j-data build on those results",
 };
 
+// Every command marked disabled anywhere, so the workflow diagram can label
+// availability from the same source the agents and the skills panel use —
+// nothing to keep manually in sync.
+export const DISABLED_COMMANDS = new Set(
+  Object.values(SKILLS_BY_AGENT)
+    .flat()
+    .filter((s) => s.disabled)
+    .map((s) => s.command),
+);
+
+export function isDisabled(command) {
+  return DISABLED_COMMANDS.has(command);
+}
+
 export function skillsForAgent(agentId) {
   return SKILLS_BY_AGENT[agentId] ?? [];
 }

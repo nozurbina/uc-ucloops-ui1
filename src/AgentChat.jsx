@@ -10,6 +10,7 @@ import {
 } from "./agentMeta.js";
 import { skillsForAgent, groupedSkillsForAgent, WORKFLOW_CHAIN } from "./skills.js";
 import { startersForAgent } from "./starters.js";
+import WorkflowDiagram from "./WorkflowDiagram.jsx";
 
 const EVIDENCE_MAP_URL = "https://urbinaconsulting.com/shares/ucloops/borderblend/";
 const MAX_FILES = 3;
@@ -241,6 +242,7 @@ export default function AgentChat() {
   const [error, setError] = useState(null);
   const [showSources, setShowSources] = useState(false);
   const [showSkills, setShowSkills] = useState(false);
+  const [showWorkflow, setShowWorkflow] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   // { personalCap: bool } when the demo's shared daily allowance is spent.
@@ -650,8 +652,24 @@ export default function AgentChat() {
         </a>
         <button
           onClick={() => {
+            setShowWorkflow((v) => !v);
+            setShowSkills(false);
+            setShowSources(false);
+          }}
+          style={{
+            ...barButtonStyle,
+            background: showWorkflow ? "var(--gold-bright)" : "rgba(255,255,255,.14)",
+            color: showWorkflow ? "var(--purple-deep)" : "#fff",
+            border: "1px solid rgba(255,255,255,.3)",
+          }}
+        >
+          How it works {showWorkflow ? "▲" : "▼"}
+        </button>
+        <button
+          onClick={() => {
             setShowSkills((v) => !v);
             setShowSources(false);
+            setShowWorkflow(false);
           }}
           style={barButtonStyle}
         >
@@ -663,6 +681,7 @@ export default function AgentChat() {
             onClick={() => {
               setShowSources((v) => !v);
               setShowSkills(false);
+              setShowWorkflow(false);
             }}
             style={barButtonStyle}
           >
@@ -821,6 +840,28 @@ export default function AgentChat() {
               New conversation
             </button>
           </header>
+
+          {/* How it works — the ucLoops workflow */}
+          {showWorkflow && (
+            <div
+              style={{
+                background: "var(--bg)",
+                borderBottom: "2px solid var(--gold)",
+                padding: "1.1rem 1.5rem",
+                flexShrink: 0,
+                maxHeight: "58vh",
+                overflowY: "auto",
+              }}
+            >
+              <WorkflowDiagram
+                onPickSkill={(command) => {
+                  setDraft((d) => (d ? d + " " : "") + command + " ");
+                  setShowWorkflow(false);
+                  inputRef.current?.focus();
+                }}
+              />
+            </div>
+          )}
 
           {/* Available skills panel */}
           {showSkills && (
