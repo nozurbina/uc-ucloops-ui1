@@ -18,7 +18,7 @@ export const WORKFLOW_LOOPS = [
   },
   {
     n: 2,
-    title: "Synthesise",
+    title: "Organise",
     agent: "Data Assistant",
     agentId: "data",
     what: "Patterns across the research become personas — either synthesised from what you supplied, or proposed for a scenario when you have no research yet.",
@@ -27,7 +27,7 @@ export const WORKFLOW_LOOPS = [
   },
   {
     n: 3,
-    title: "Embody",
+    title: "Simulate",
     agent: "Persona Simulations",
     agentId: "omar",
     what: "Each persona becomes something you can talk to. It answers in first person from its own research, and will push back rather than agree with you.",
@@ -63,10 +63,10 @@ export const WORKFLOW_LOOPS = [
   },
   {
     n: 7,
-    title: "Specify",
+    title: "Extract",
     agent: "UX Assistant",
     agentId: "ux",
-    what: "Turn the journey and personas into something a delivery team can act on, with the traceability back to source intact.",
+    what: "Turn the journey and personas into something a team can act on, with the traceability back to source intact.",
     skills: ["/stories"],
     produces: "User stories with acceptance criteria, sources, and priority signals",
   },
