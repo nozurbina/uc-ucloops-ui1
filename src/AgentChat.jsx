@@ -58,6 +58,107 @@ const barButtonStyle = {
   whiteSpace: "nowrap",
 };
 
+// Inline styles can't carry media queries, so the breakpoint is observed in JS
+// and drives the same style objects everything else uses.
+function useIsNarrow(breakpoint = 860) {
+  const [narrow, setNarrow] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    setNarrow(mq.matches);
+    const onChange = (e) => setNarrow(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [breakpoint]);
+  return narrow;
+}
+
+/**
+ * A height-capped scroll area that shows where there's more content.
+ *
+ * Fades appear only on the edges that actually have content beyond them, so a
+ * panel that fits entirely gets no decoration at all — the affordance is a
+ * signal, not permanent furniture. Measured via ResizeObserver as well as
+ * onScroll, because panel content changes height when you switch agents.
+ */
+function ScrollPanel({ maxHeight, fadeColor, padding, style, children }) {
+  const ref = useRef(null);
+  const [edges, setEdges] = useState({ overflowing: false, atTop: true, atBottom: true });
+
+  const measure = () => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({
+      overflowing: el.scrollHeight > el.clientHeight + 2,
+      atTop: el.scrollTop <= 2,
+      atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 2,
+    });
+  };
+
+  useEffect(() => {
+    measure();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // Observe the inner content too — switching agents changes its height
+    // without any scroll or window resize happening.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [children]);
+
+  const fade = (edge) => ({
+    position: "absolute",
+    left: 0,
+    right: 0,
+    [edge]: 0,
+    height: edge === "bottom" ? 46 : 28,
+    pointerEvents: "none",
+    background: `linear-gradient(to ${edge}, transparent, ${fadeColor})`,
+  });
+
+  return (
+    <div style={{ position: "relative", minHeight: 0, ...style }}>
+      <div
+        ref={ref}
+        onScroll={measure}
+        className="uc-scroll"
+        style={{ maxHeight, overflowY: "auto", padding }}
+      >
+        {children}
+      </div>
+
+      {edges.overflowing && !edges.atTop && <div style={fade("top")} />}
+      {edges.overflowing && !edges.atBottom && (
+        <>
+          <div style={fade("bottom")} />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              pointerEvents: "none",
+              background: "var(--slate)",
+              color: "#fff",
+              borderRadius: 999,
+              padding: ".16rem .6rem",
+              fontSize: ".66rem",
+              fontWeight: 700,
+              letterSpacing: ".04em",
+              opacity: 0.82,
+              whiteSpace: "nowrap",
+            }}
+          >
+            scroll for more ↓
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function emptyConvo(maxTurns) {
   return {
     messages: [],
@@ -942,14 +1043,14 @@ export default function AgentChat() {
 
           {/* How it works — the ucLoops workflow */}
           {showWorkflow && (
-            <div
+            <ScrollPanel
+              maxHeight="75vh"
+              fadeColor="#f5f5f5"
+              padding="1.1rem 1.5rem"
               style={{
                 background: "var(--bg)",
                 borderBottom: "2px solid var(--gold)",
-                padding: "1.1rem 1.5rem",
                 flexShrink: 0,
-                maxHeight: "75vh",
-                overflowY: "auto",
               }}
             >
               <WorkflowDiagram
@@ -959,19 +1060,19 @@ export default function AgentChat() {
                   inputRef.current?.focus();
                 }}
               />
-            </div>
+            </ScrollPanel>
           )}
 
           {/* Available skills panel */}
           {showSkills && (
-            <div
+            <ScrollPanel
+              maxHeight="60vh"
+              fadeColor="#ffffff"
+              padding="1rem 1.5rem"
               style={{
                 background: "#fff",
                 borderBottom: "2px solid var(--amber)",
-                padding: "1rem 1.5rem",
                 flexShrink: 0,
-                maxHeight: "45vh",
-                overflowY: "auto",
               }}
             >
               <div style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -1137,7 +1238,7 @@ export default function AgentChat() {
                   the agent will describe what it does and when you'd use it, without running it.
                 </div>
               </div>
-            </div>
+            </ScrollPanel>
           )}
 
           {/* Sources panel */}
@@ -1740,6 +1841,16 @@ export default function AgentChat() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         textarea::placeholder { color: #9ca3af; }
+        /* Force a visible scrollbar in the panels. Overlay scrollbars hide
+           until you scroll, which is precisely when the hint is needed. */
+        .uc-scroll { scrollbar-width: thin; scrollbar-color: #c9c3cf transparent; }
+        .uc-scroll::-webkit-scrollbar { width: 10px; }
+        .uc-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,.04); }
+        .uc-scroll::-webkit-scrollbar-thumb {
+          background: #c9c3cf; border-radius: 999px; border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .uc-scroll::-webkit-scrollbar-thumb:hover { background: #a99fb3; background-clip: content-box; }
         .md-content { min-width: 0; }
         .md-content > *:first-child { margin-top: 0; }
         .md-content > *:last-child { margin-bottom: 0; }

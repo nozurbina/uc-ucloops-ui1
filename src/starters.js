@@ -116,15 +116,38 @@ const CONSUMER_STAGE =
 const FRANCHISEE_STAGE =
   "the decision stage where you were evaluating whether to sign on as a BorderBlend operator — running the numbers and talking to existing operators";
 
-export const STARTERS_BY_AGENT = {
+// Persona-specific question pools. There are more here than fit on screen, so
+// two are rotated in per conversation — same mechanism as the shared pool. This
+// is where to add new persona questions; nothing else needs changing.
+const PERSONA_POOLS = {
   omar: [
     {
       label: "Walk me through a typical weekday lunch",
       prompt: "Walk me through a typical weekday lunch — start to finish.",
       hint: "How the routine actually works",
     },
-    ...personaCommon(CONSUMER_STAGE),
+    {
+      label: "What job does lunch need to do?",
+      prompt: "What's the actual job you need lunch to do?",
+      hint: "The brief, in his own terms",
+    },
+    {
+      label: "What's ordering for the team like?",
+      prompt: "You're often ordering for the team, not just yourself — what's that like?",
+      hint: "The part that isn't about him",
+    },
+    {
+      label: "What happens to the receipt?",
+      prompt: "What happens to your receipt by the time finance wants it?",
+      hint: "Expensing friction",
+    },
+    {
+      label: "What would make it a weekly fixture?",
+      prompt: "What would it take for BorderBlend to become a fixture in your week?",
+      hint: "From option to infrastructure",
+    },
   ],
+
   grace: [
     {
       label: "How do you organise a team lunch?",
@@ -136,8 +159,29 @@ export const STARTERS_BY_AGENT = {
       prompt: "What tends to go wrong when you order catering for a group?",
       hint: "Where the risk sits for you",
     },
-    ...personaCommon(CONSUMER_STAGE),
+    {
+      label: "How did you first find BorderBlend?",
+      prompt: "How did you actually first find BorderBlend?",
+      hint: "The discovery route",
+    },
+    {
+      label: "The week before a big client booking",
+      prompt: "Walk me through the week before a big client booking.",
+      hint: "The prep nobody sees",
+    },
+    {
+      label: "How do you handle allergies for thirty?",
+      prompt: "How do you handle allergies for a group of thirty?",
+      hint: "The detail that carries the risk",
+    },
+    {
+      label: "What's the Calgary winter problem?",
+      prompt:
+        "What's the Calgary winter problem, and what would make you route everything to BorderBlend?",
+      hint: "Seasonality, and what would win the whole account",
+    },
   ],
+
   mateo: [
     {
       label: "What's ordering at 1am actually like?",
@@ -147,10 +191,31 @@ export const STARTERS_BY_AGENT = {
     {
       label: "Why do you bring people along?",
       prompt: "You often turn up with a group — why, and how does that work?",
-      hint: "How you became the convener",
+      hint: "How he became the convener",
     },
-    ...personaCommon(CONSUMER_STAGE),
+    {
+      label: "Walk me through a typical night",
+      prompt: "Walk me through a typical night — when does your shift end, and what happens next?",
+      hint: "Shift end to first bite",
+    },
+    {
+      label: "What made you a regular?",
+      prompt: "What made you a BorderBlend regular in the first place?",
+      hint: "The moment it converted him",
+    },
+    {
+      label: "What makes the brisket different?",
+      prompt:
+        'What makes the brisket different from other places\' "smoked brisket"?',
+      hint: "Why he can tell, and why it matters",
+    },
+    {
+      label: "Most frustrating thing about being a fan?",
+      prompt: "What's the single most frustrating thing about being a fan of this truck?",
+      hint: "The cost of loyalty",
+    },
   ],
+
   diego: [
     {
       label: "What's hardest about running the trucks?",
@@ -162,16 +227,65 @@ export const STARTERS_BY_AGENT = {
       prompt: "Where does the head office relationship help you, and where does it get in the way?",
       hint: "The franchise tension",
     },
-    ...personaCommon(FRANCHISEE_STAGE),
+    {
+      label: "How did you end up owning trucks?",
+      prompt: "How did you end up owning BorderBlend trucks?",
+      hint: "The route into the franchise",
+    },
+    {
+      label: "How do you know the trucks are doing well?",
+      prompt: "How do you know if your trucks are actually doing well?",
+      hint: "What he can measure, and what he can't",
+    },
+    {
+      label: "What should HQ do with your data?",
+      prompt:
+        "You've got years of local customer data. What do you wish HQ would do with it?",
+      hint: "Local insight vs national decisions",
+    },
+    {
+      label: "How would you grow without losing the standard?",
+      prompt:
+        "What would it take to grow from a couple of trucks to a small fleet without dropping the brisket standard?",
+      hint: "Scaling without diluting",
+    },
   ],
+
   tyler: [
     {
       label: "What would make you a regular?",
       prompt: "What would it take for you to become a regular somewhere?",
       hint: "Convenience vs loyalty",
     },
-    ...personaCommon(CONSUMER_STAGE),
+    {
+      label: "Why BorderBlend?",
+      prompt: "Why BorderBlend?",
+      hint: "Blunt, and probably short",
+    },
+    {
+      label: "Do you follow the brand online?",
+      prompt: "Do you follow the brand anywhere online?",
+      hint: "Which channels reach him, and which don't",
+    },
+    {
+      label: "What if the truck isn't there?",
+      prompt: "What happens if the truck isn't there when you get off the train?",
+      hint: "The fallback behaviour",
+    },
+    {
+      label: "What do you make of the price?",
+      prompt: "What do you make of the price — has it changed how you feel about going?",
+      hint: "Price sensitivity",
+    },
   ],
+};
+
+export const STARTERS_BY_AGENT = {
+  omar: [...personaCommon(CONSUMER_STAGE)],
+  grace: [...personaCommon(CONSUMER_STAGE)],
+  mateo: [...personaCommon(CONSUMER_STAGE)],
+  diego: [...personaCommon(FRANCHISEE_STAGE)],
+  tyler: [...personaCommon(CONSUMER_STAGE)],
 
   // Note: these prompts are deliberately fully specified. The master templates
   // instruct the assistants to stop and ask when a skill is missing input, which
@@ -246,15 +360,18 @@ export function startersForAgent(agentId, seed = 0.5) {
   const base = STARTERS_BY_AGENT[agentId] ?? [];
   if (!ROTATES.has(agentId)) return base;
 
-  // Ordering: plain questions → rotated questions → skills → interface actions.
-  // Action cards go last because they leave the conversation rather than
-  // advancing it. Note `prompt` is optional on action cards, hence the ?? "".
-  const rotated = pickFromPool(SHARED_QUESTION_POOL, ROTATE_COUNT, seed);
-  const isSkill = (s) => (s.prompt ?? "").trim().startsWith("/");
+  // Two pools, drawn independently: questions specific to this persona, and
+  // questions that suit any of them. The shared pool uses a derived seed so it
+  // doesn't move in lockstep with the persona pool.
+  const personaPicks = pickFromPool(PERSONA_POOLS[agentId] ?? [], ROTATE_COUNT, seed);
+  const sharedPicks = pickFromPool(SHARED_QUESTION_POOL, ROTATE_COUNT, (seed * 7.13) % 1);
 
+  // Ordering: persona-specific → general → skills → interface actions. Action
+  // cards go last because they leave the conversation rather than advancing it.
+  // `prompt` is optional on action cards, hence the ?? "".
+  const isSkill = (s) => (s.prompt ?? "").trim().startsWith("/");
   const actionCards = base.filter((s) => s.action);
   const skillCards = base.filter((s) => !s.action && isSkill(s));
-  const questionCards = base.filter((s) => !s.action && !isSkill(s));
 
-  return [...questionCards, ...rotated, ...skillCards, ...actionCards];
+  return [...personaPicks, ...sharedPicks, ...skillCards, ...actionCards];
 }
