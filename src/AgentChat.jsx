@@ -622,9 +622,10 @@ export default function AgentChat() {
     setSkillQuery(null);
     setAttachments([]);
     setError(null);
-    // On a phone the sidebar covers the conversation, so picking an agent has
-    // to dismiss it or you can't see who you just chose.
-    setSidebarOpen(false);
+    // Only on a phone, where the drawer covers the conversation and you
+    // couldn't otherwise see who you just picked. On desktop the sidebar is a
+    // permanent column and should stay exactly where it is.
+    if (isNarrow) setSidebarOpen(false);
   }
 
   function insertSkill(command) {
