@@ -652,21 +652,6 @@ export default function AgentChat() {
         </a>
         <button
           onClick={() => {
-            setShowWorkflow((v) => !v);
-            setShowSkills(false);
-            setShowSources(false);
-          }}
-          style={{
-            ...barButtonStyle,
-            background: showWorkflow ? "var(--gold-bright)" : "rgba(255,255,255,.14)",
-            color: showWorkflow ? "var(--purple-deep)" : "#fff",
-            border: "1px solid rgba(255,255,255,.3)",
-          }}
-        >
-          How it works {showWorkflow ? "▲" : "▼"}
-        </button>
-        <button
-          onClick={() => {
             setShowSkills((v) => !v);
             setShowSources(false);
             setShowWorkflow(false);
@@ -726,6 +711,67 @@ export default function AgentChat() {
             >
               BorderBlend engagement · synthetic case
             </p>
+          </div>
+
+          {/* Primary entry point to the workflow explainer. Sits above the agent
+              list because understanding the loops is what makes the agent list
+              make sense — as a top-bar button it read as a minor utility. */}
+          <div style={{ padding: ".85rem .75rem .25rem" }}>
+            <button
+              onClick={() => {
+                setShowWorkflow((v) => !v);
+                setShowSkills(false);
+                setShowSources(false);
+              }}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: ".7rem",
+                textAlign: "left",
+                padding: ".7rem .8rem",
+                borderRadius: 10,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                background: showWorkflow
+                  ? "linear-gradient(180deg,var(--gold-bright),var(--gold))"
+                  : "rgba(255,255,255,.07)",
+                border: showWorkflow
+                  ? "1px solid var(--gold)"
+                  : "1px dashed rgba(232,188,82,.55)",
+                color: showWorkflow ? "var(--purple-deep)" : "#fff",
+                transition: "background .15s, border-color .15s",
+              }}
+            >
+              <span style={{ fontSize: "1.15rem", lineHeight: 1, flexShrink: 0 }}>🔄</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: ".86rem", fontWeight: 700 }}>
+                  How ucLoops works
+                </div>
+                <div
+                  style={{
+                    fontSize: ".71rem",
+                    color: showWorkflow ? "rgba(80,8,80,.75)" : "rgba(255,255,255,.6)",
+                    lineHeight: 1.35,
+                  }}
+                >
+                  The 8 loops, and who does what
+                </div>
+              </span>
+              <span style={{ fontSize: ".7rem", opacity: 0.7, flexShrink: 0 }}>
+                {showWorkflow ? "▲" : "▶"}
+              </span>
+            </button>
+            <div
+              style={{
+                fontSize: ".68rem",
+                color: "rgba(255,255,255,.4)",
+                textAlign: "center",
+                padding: ".6rem 0 .1rem",
+              }}
+            >
+              ↓ pick an agent to talk to
+            </div>
           </div>
 
           {[
