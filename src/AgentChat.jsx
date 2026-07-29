@@ -348,6 +348,8 @@ export default function AgentChat() {
   const [showSources, setShowSources] = useState(false);
   const [showSkills, setShowSkills] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const isNarrow = useIsNarrow();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   // { personalCap: bool } when the demo's shared daily allowance is spent.
@@ -616,9 +618,13 @@ export default function AgentChat() {
     setActiveId(id);
     setShowSources(false);
     setShowSkills(false);
+    setShowWorkflow(false);
     setSkillQuery(null);
     setAttachments([]);
     setError(null);
+    // On a phone the sidebar covers the conversation, so picking an agent has
+    // to dismiss it or you can't see who you just chose.
+    setSidebarOpen(false);
   }
 
   function insertSkill(command) {
@@ -737,11 +743,12 @@ export default function AgentChat() {
           color: "#fff",
           display: "flex",
           alignItems: "center",
-          gap: ".6rem",
+          gap: ".4rem",
           padding: ".4rem .7rem",
           boxShadow: "0 3px 10px rgba(0,0,0,.18)",
           flexShrink: 0,
           zIndex: 20,
+          flexWrap: "wrap",
         }}
       >
         <a
@@ -751,17 +758,20 @@ export default function AgentChat() {
           style={{
             color: "#cdd7e0",
             textDecoration: "none",
-            fontSize: ".82rem",
+            fontSize: isNarrow ? ".74rem" : ".82rem",
             fontWeight: 600,
-            flex: 1,
+            flex: isNarrow ? "0 1 auto" : 1,
             display: "flex",
             alignItems: "center",
             gap: ".4rem",
+            whiteSpace: "nowrap",
           }}
         >
           <span>←</span>
-          <span>Back to BorderBlend Evidence Map</span>
+          {/* The full label is the first thing to overflow on a phone. */}
+          <span>{isNarrow ? "Evidence Map" : "Back to BorderBlend Evidence Map"}</span>
         </a>
+        {isNarrow && <span style={{ flex: 1 }} />}
         <button
           onClick={() => {
             setShowSkills((v) => !v);
@@ -787,19 +797,65 @@ export default function AgentChat() {
         )}
       </div>
 
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {/* Sidebar */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
+        {/* Backdrop — only exists while the drawer is open on a narrow screen */}
+        {isNarrow && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,.45)",
+              zIndex: 90,
+            }}
+          />
+        )}
+
+        {/* Sidebar — a fixed drawer on narrow screens, a static column otherwise */}
         <aside
+          className="uc-scroll"
           style={{
-            width: 280,
+            width: isNarrow ? "80vw" : 280,
+            maxWidth: 320,
             flexShrink: 0,
             background: "var(--slate)",
             color: "#fff",
             display: "flex",
             flexDirection: "column",
             overflowY: "auto",
+            ...(isNarrow
+              ? {
+                  position: "fixed",
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  zIndex: 100,
+                  transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+                  transition: "transform .22s ease",
+                  boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,.4)" : "none",
+                }
+              : {}),
           }}
         >
+          {isNarrow && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                alignSelf: "flex-end",
+                margin: ".6rem .7rem 0",
+                background: "rgba(255,255,255,.12)",
+                border: "1px solid rgba(255,255,255,.25)",
+                color: "#fff",
+                borderRadius: 8,
+                padding: ".3rem .7rem",
+                fontSize: ".75rem",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              ✕ Close
+            </button>
+          )}
           <div
             style={{
               padding: "1.25rem 1.25rem 1rem",
@@ -962,22 +1018,78 @@ export default function AgentChat() {
 
         {/* Main column */}
         <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Drawer handle. Shows who you're talking to as well as opening the
+              list, so the bar carries information rather than just being a
+              control taking up a row on a small screen. */}
+          {isNarrow && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: ".6rem",
+                width: "100%",
+                background: "var(--slate-2)",
+                border: "none",
+                borderBottom: "1px solid rgba(255,255,255,.12)",
+                color: "#fff",
+                padding: ".5rem .8rem",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: "1rem", lineHeight: 1 }}>☰</span>
+              <AgentAvatar agent={active} size={24} ring={false} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: ".78rem", fontWeight: 700 }}>
+                  Open to chat with agents
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: ".68rem",
+                    color: "rgba(255,255,255,.6)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Now: {active.name}
+                </span>
+              </span>
+              <span style={{ fontSize: ".7rem", opacity: 0.6 }}>▶</span>
+            </button>
+          )}
           <header
             style={{
               background: "var(--purple-deep)",
               color: "#fff",
-              padding: "1rem 1.5rem",
+              padding: isNarrow ? ".7rem .9rem" : "1rem 1.5rem",
               display: "flex",
-              alignItems: "center",
+              alignItems: isNarrow ? "flex-start" : "center",
               justifyContent: "space-between",
-              gap: "1rem",
+              gap: isNarrow ? ".6rem" : "1rem",
               boxShadow: "0 2px 8px rgba(0,0,0,.15)",
               flexShrink: 0,
             }}
           >
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{active.name}</div>
-              <div style={{ fontSize: ".8rem", color: "rgba(255,255,255,.75)" }}>
+              <div style={{ fontSize: isNarrow ? "1rem" : "1.1rem", fontWeight: 700 }}>
+                {active.name}
+              </div>
+              <div
+                style={{
+                  fontSize: isNarrow ? ".72rem" : ".8rem",
+                  color: "rgba(255,255,255,.75)",
+                  // On a phone this was wrapping to one word per line, because
+                  // the sidebar left almost no width for it.
+                  ...(isNarrow
+                    ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+                    : {}),
+                }}
+              >
                 {active.role} · {active.detail}
               </div>
               {/* Always-present links to this persona's artefacts. The system
