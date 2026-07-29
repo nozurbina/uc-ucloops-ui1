@@ -1710,10 +1710,13 @@ export default function AgentChat() {
                   gap: "1rem",
                 }}
               >
-                <span>
+                {/* Order matters: each label sits under the control it
+                    describes — attachment note under the paperclip on the
+                    left, message counter under Send on the right. */}
+                <span>Attach up to {MAX_FILES} files, 1MB each</span>
+                <span style={{ textAlign: "right" }}>
                   {convo.turnsUsed}/{convo.turnsMax} messages used in this conversation
                 </span>
-                <span>Attach up to {MAX_FILES} files, 1MB each</span>
               </div>
             </div>
           </div>
