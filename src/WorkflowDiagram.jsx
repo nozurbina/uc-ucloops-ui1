@@ -8,6 +8,14 @@ const AGENT_COLOUR = {
   null: "#667085",
 };
 
+// Shared by the three intro paragraphs, which are styled identically.
+const INTRO_P = {
+  margin: "0 0 1rem",
+  fontSize: ".84rem",
+  color: "var(--text-muted)",
+  lineHeight: 1.55,
+};
+
 function SkillPill({ command, onPick }) {
   const off = isDisabled(command);
   return (
@@ -50,18 +58,17 @@ export default function WorkflowDiagram({ onPickSkill }) {
           color: "var(--slate)",
         }}
       >
-        How to work with ucLoops
+        Welcome to the ucLoops demo app
       </p>
-      <p
-        style={{
-          margin: "0 0 1rem",
-          fontSize: ".84rem",
-          color: "var(--text-muted)",
-          lineHeight: 1.55,
-        }}
-      >
-        ucLoops supports working real evidence, augmented by AI when there are gaps. Each stage of the workflow is a loop hands its output to the next. Different agents support different
-        loops, that's why you switch between them in the sidebar rather than asking one agent to do everything. Humans are the loop. You're always in control and can decide how much of the results are anchored in your data or generated with AI.
+      <p style={INTRO_P}>
+        ucLoops is an AI methodology you can use on your own machine with no software besides the AI tools (Claude, ChatGPT, Grok, etc) that you use today. It is a strategy and experience design system that supports working real evidence, augmented by AI when there are gaps.
+      </p>
+      <p style={INTRO_P}>
+        People use it to create strategies and designs for marketing, sales, knowledge, and user experience. Each stage of the workflow is a loop hands its output to the next. Different agents support different
+        loops, that's why you switch between them in the sidebar rather than asking one agent to do everything.
+      </p>
+      <p style={INTRO_P}>
+        <strong>Humans are the loop.</strong> You're always in control and can decide how much of the results are anchored in your data or generated with AI and how much analysis is hands-on vs automated.
       </p>
 
       {disabledCount > 0 && (
