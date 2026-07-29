@@ -3,9 +3,12 @@
 // message. They exist to answer "what do I even ask this thing?" — so each one
 // is a genuinely useful first move, not a demo script.
 //
-// `fill: true` means the starter needs something from the user (a transcript to
-// clean, a challenge to critique), so clicking it puts the text in the composer
-// with focus rather than sending straight away. Everything else sends on click.
+// Three kinds of starter:
+//   default        — clicking sends the prompt as a message
+//   fill: true     — needs something from the user (a transcript, a challenge),
+//                    so it lands in the composer with focus instead of sending
+//   action: "…"    — not a message at all; opens something in the interface.
+//                    Costs no turns and no tokens.
 
 // Questions that work for any persona. Two are rotated in per conversation so
 // the demo doesn't feel scripted, and so someone who tries several personas —
@@ -91,6 +94,14 @@ function personaCommon(stageDescription) {
       prompt: "/ideate ",
       hint: "Describe a change and I'll be frank about it",
       fill: true,
+    },
+    {
+      // Opens the Sources & evidence panel rather than asking the persona,
+      // which is both instant and more honest: the panel lists the actual
+      // interviews with links, where the persona would only describe them.
+      label: "Show me the evidence you're based on",
+      hint: "Opens the interviews and research behind me",
+      action: "sources",
     },
   ];
 }
@@ -235,10 +246,15 @@ export function startersForAgent(agentId, seed = 0.5) {
   const base = STARTERS_BY_AGENT[agentId] ?? [];
   if (!ROTATES.has(agentId)) return base;
 
-  // Rotated questions sit after the persona-specific openers but before the
-  // skill cards, so the ordering stays: about you → about you → run a skill.
+  // Ordering: plain questions → rotated questions → skills → interface actions.
+  // Action cards go last because they leave the conversation rather than
+  // advancing it. Note `prompt` is optional on action cards, hence the ?? "".
   const rotated = pickFromPool(SHARED_QUESTION_POOL, ROTATE_COUNT, seed);
-  const skillCards = base.filter((s) => s.prompt.trim().startsWith("/"));
-  const questionCards = base.filter((s) => !s.prompt.trim().startsWith("/"));
-  return [...questionCards, ...rotated, ...skillCards];
+  const isSkill = (s) => (s.prompt ?? "").trim().startsWith("/");
+
+  const actionCards = base.filter((s) => s.action);
+  const skillCards = base.filter((s) => !s.action && isSkill(s));
+  const questionCards = base.filter((s) => !s.action && !isSkill(s));
+
+  return [...questionCards, ...rotated, ...skillCards, ...actionCards];
 }

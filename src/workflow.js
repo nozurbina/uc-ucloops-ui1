@@ -93,4 +93,4 @@ export const CROSS_CUTTING = {
 };
 
 export const LOOP_BACK_NOTE =
-  "Outputs from any loop become inputs to the next run — a persona export feeds the journey work, a journey map feeds the next round of research questions. That feedback is the loop in ucLoops: each pass leaves the next one better grounded.";
+  "Outputs from any loop become inputs to the next run — a persona export feeds the journey work, a journey map feeds the next round of research questions. Humans are the loop in ucLoops: each pass leaves the next one better grounded in real human research (although you can use AI to fill in some gaps).";

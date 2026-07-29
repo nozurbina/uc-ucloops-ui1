@@ -487,14 +487,21 @@ export default function AgentChat() {
   }
 
   function useStarter(starter) {
+    if (starter.action === "sources") {
+      // An interface action, not a message — costs no turns and no tokens.
+      setShowSources(true);
+      setShowSkills(false);
+      setShowWorkflow(false);
+      return;
+    }
     if (starter.fill) {
       // Needs the user to add something (a transcript, a challenge) — hand them
       // the composer rather than sending an incomplete request.
       setDraft(starter.prompt);
       inputRef.current?.focus();
-    } else {
-      send(starter.prompt);
+      return;
     }
+    send(starter.prompt);
   }
 
   function resetConversation() {
@@ -1305,9 +1312,14 @@ export default function AgentChat() {
                         onClick={() => useStarter(s)}
                         style={{
                           textAlign: "left",
-                          background: "var(--bg-card)",
-                          border: "1px solid var(--border)",
-                          borderLeft: "3px solid var(--gold)",
+                          // Action cards are tinted to match the panel they
+                          // open, so it's not a surprise when clicking one
+                          // reveals a panel instead of sending a message.
+                          background: s.action ? "#fdf8ee" : "var(--bg-card)",
+                          border: s.action ? "1px solid #f0d999" : "1px solid var(--border)",
+                          borderLeft: s.action
+                            ? "3px solid var(--amber)"
+                            : "3px solid var(--gold)",
                           borderRadius: 10,
                           padding: ".55rem .8rem",
                           cursor: "pointer",
@@ -1320,10 +1332,11 @@ export default function AgentChat() {
                           style={{
                             fontSize: ".84rem",
                             fontWeight: 600,
-                            color: "var(--slate)",
+                            color: s.action ? "#7a5c0a" : "var(--slate)",
                             marginBottom: ".12rem",
                           }}
                         >
+                          {s.action === "sources" && "🎙️ "}
                           {s.label}
                           {s.fill && (
                             <span
