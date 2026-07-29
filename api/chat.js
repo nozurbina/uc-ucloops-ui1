@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getAgent } from "../src/agents.js";
 import { skillsForAgent } from "../src/skills.js";
+import { getAgentMeta, EVIDENCE_MAP_URL } from "../src/agentMeta.js";
 import {
   encodeToken,
   resolveTurns,
@@ -53,6 +54,55 @@ When a user asks for a disabled skill, you must NOT:
 - Generate the document, table, index, or file it would normally create, or offer a download.
 
 Every skill NOT in that list works normally. This conversation is also limited to a fixed number of turns, and files created by skills cannot be downloaded in the demo.`;
+}
+
+// A skill invoked bare ("/j-stage") correctly triggers a request for input — but
+// the agents were answering with references to things the user has never seen,
+// e.g. offering 'Stage 1: "The Word in the Scene"' to someone who doesn't know a
+// journey map exists, let alone where to find it. This gives each agent the real
+// URLs and stage names, and rules for asking well.
+function contextResourcesAddendum(agent) {
+  const meta = getAgentMeta(agent.id);
+  if (!meta) return "";
+
+  const lines = [`- The BorderBlend evidence map (all of the research): ${EVIDENCE_MAP_URL}`];
+
+  if (meta.profileUrl) {
+    lines.push(
+      agent.type === "persona"
+        ? `- Your own full persona profile: ${meta.profileUrl}`
+        : `- Persona profiles: ${meta.profileUrl}`,
+    );
+  }
+  if (meta.journeyUrl && meta.journeyStages?.length) {
+    lines.push(
+      `- Your mapped journey, the "${meta.journeyLabel}": ${meta.journeyUrl}`,
+      `  Its stages, in order: ${meta.journeyStages.map((s) => `"${s}"`).join(" → ")}`,
+    );
+  }
+  if (agent.type === "persona" && !meta.journeyUrl) {
+    lines.push(
+      `- You have NO mapped journey yet. Don't imply one exists or offer stage names as if they were already agreed — if a journey stage is needed, help the user define one from scratch.`,
+    );
+  }
+
+  return `
+
+---
+# WHAT YOU CAN POINT PEOPLE TO
+
+${lines.join("\n")}
+
+# ASKING FOR INPUT WELL
+
+When a skill needs something you don't have, ask — but assume the user is seeing this for the first time and has read none of the research:
+
+- Never mention a journey, stage, persona, insight, or document as though they already know it exists. Say in the same breath what it is.
+- **Hard requirement: the first time in a conversation that you mention your mapped journey or any of its stage names, include the journey map URL from the list above in that same message, as a markdown link.** Same for the persona profile or evidence map if you refer to those. A named artefact with no link is useless to someone who has never seen it. (Once you've linked it in a conversation, you needn't repeat the link.)
+- Prefer concrete options over an open question. Where you have real stage names, list them as the choices, and make clear they can also invent a new one.
+- If the skill needs a document — a transcript, notes, research — say they can paste it into the message box or attach a file. This interface accepts up to 3 attachments, 1MB each.
+- If a skill can't do anything useful yet because the conversation is empty (summarising nothing, restyling output that doesn't exist), say so plainly and suggest what to do first.
+- Two or three lines. Don't interrogate.`;
 }
 
 // Only applied to the internal /initialize call. The persona template chains
@@ -178,6 +228,7 @@ export default async function handler(req, res) {
     const system =
       agent.description +
       CHAT_MODE_ADDENDUM +
+      contextResourcesAddendum(agent) +
       demoModeAddendum(agent) +
       (init ? INIT_ADDENDUM : "");
 

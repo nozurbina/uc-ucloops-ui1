@@ -822,6 +822,48 @@ export default function AgentChat() {
               <div style={{ fontSize: ".8rem", color: "rgba(255,255,255,.75)" }}>
                 {active.role} · {active.detail}
               </div>
+              {/* Always-present links to this persona's artefacts. The system
+                  prompt also asks agents to link these when they mention them,
+                  but that's probabilistic — a navigational affordance shouldn't
+                  depend on the model remembering. */}
+              {(active.profileUrl || active.journeyUrl) && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: ".7rem",
+                    marginTop: ".4rem",
+                    fontSize: ".73rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {active.profileUrl && (
+                    <a
+                      href={active.profileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "var(--gold-bright)", textDecoration: "none", fontWeight: 600 }}
+                    >
+                      🏷️ Persona profile ↗
+                    </a>
+                  )}
+                  {active.journeyUrl ? (
+                    <a
+                      href={active.journeyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "var(--gold-bright)", textDecoration: "none", fontWeight: 600 }}
+                    >
+                      🗺️ {active.journeyLabel} ↗
+                    </a>
+                  ) : (
+                    active.type === "persona" && (
+                      <span style={{ color: "rgba(255,255,255,.5)" }}>
+                        No journey mapped yet
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
             </div>
             <button
               onClick={resetConversation}

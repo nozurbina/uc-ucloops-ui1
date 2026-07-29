@@ -5,6 +5,25 @@
 // never bundled into the browser.
 
 const SITE = "https://urbinaconsulting.com/shares/ucloops/borderblend";
+export const EVIDENCE_MAP_URL = `${SITE}/`;
+
+// Stage names of each mapped journey, so an agent asking "which stage?" can
+// offer the real options — and so it never name-drops a stage without being
+// able to say where the journey lives.
+const BUSINESS_LUNCH_STAGES = [
+  "The Trusted Tip",
+  "The Solo Vet",
+  "Into the Rotation",
+  "Proving the Operation",
+  "Opting In",
+];
+const LATE_NIGHT_STAGES = [
+  "The Word in the Scene",
+  "First Bite at 1 A.M.",
+  "Running the Table",
+  "The Hunt",
+  "On the List",
+];
 
 export const PERSONA_META = [
   {
@@ -19,6 +38,7 @@ export const PERSONA_META = [
     profileUrl: `${SITE}/persona-omar-v3.html`,
     journeyUrl: `${SITE}/journey-map-business-lunch-v3.html`,
     journeyLabel: "Business Lunch journey map",
+    journeyStages: BUSINESS_LUNCH_STAGES,
     sources: [
       { id: "BB-INT013", label: "BB-INT013 — David Okonkwo", words: 2076, url: `${SITE}/sources/BB-INT013.html` },
       { id: "BB-INT019", label: "BB-INT019 — Wesley Cho", words: 2849, url: `${SITE}/sources/BB-INT019.html` },
@@ -36,6 +56,7 @@ export const PERSONA_META = [
     profileUrl: `${SITE}/persona-grace-v3.html`,
     journeyUrl: `${SITE}/journey-map-business-lunch-v3.html`,
     journeyLabel: "Business Lunch journey map",
+    journeyStages: BUSINESS_LUNCH_STAGES,
     sources: [
       { id: "BB-INT014", label: "BB-INT014 — Nadia Haddad", words: 2417, url: `${SITE}/sources/BB-INT014.html` },
       { id: "BB-INT020", label: "BB-INT020 — Bianca Rossi", words: 2780, url: `${SITE}/sources/BB-INT020.html` },
@@ -53,6 +74,7 @@ export const PERSONA_META = [
     profileUrl: `${SITE}/persona-late-night-foodie-v3.html`,
     journeyUrl: `${SITE}/journey-map-late-night-v3.html`,
     journeyLabel: "Late-Night Foodie journey map",
+    journeyStages: LATE_NIGHT_STAGES,
     sources: [
       { id: "BB-INT017", label: "BB-INT017 — André Silva", words: 2315, url: `${SITE}/sources/BB-INT017.html` },
       { id: "BB-INT018", label: "BB-INT018 — Sofia Tremblay", words: 1839, url: `${SITE}/sources/BB-INT018.html` },
@@ -70,6 +92,7 @@ export const PERSONA_META = [
     profileUrl: `${SITE}/persona-franchisee-v3.html`,
     journeyUrl: null,
     journeyLabel: null,
+    journeyStages: [],
     sources: [
       { id: "BB-INT001", label: "BB-INT001 — Diego Montoya", words: 1182, url: `${SITE}/sources/BB-INT001.html` },
       { id: "BB-INT002", label: "BB-INT002 — Marc Bélanger", words: 1065, url: `${SITE}/sources/BB-INT002.html` },
@@ -92,6 +115,7 @@ export const PERSONA_META = [
     profileUrl: `${SITE}/persona-everyday-20s-v3.html`,
     journeyUrl: null,
     journeyLabel: null,
+    journeyStages: [],
     sources: [
       { id: "BB-INT015", label: "BB-INT015 — Tyler Brooks", words: 1444, url: `${SITE}/sources/BB-INT015.html` },
       { id: "BB-INT016", label: "BB-INT016 — Megan Liu", words: 1925, url: `${SITE}/sources/BB-INT016.html` },
