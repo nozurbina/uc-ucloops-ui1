@@ -13,6 +13,8 @@ import {
   checkPassword,
   setGateCookie,
   clientIp,
+  capsEnforced,
+  peekDailyUsage,
 } from "./_limits.js";
 
 // Crude in-memory throttle to make guessing tedious. Serverless instances are
@@ -36,7 +38,20 @@ function tooManyAttempts(ip) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
-    res.status(200).json({ gateEnabled: gateEnabled(), unlocked: isUnlocked(req) });
+    // `capsEnforced` is a deployment health signal, not something the UI uses:
+    // the spend caps fail open by design, so without a way to see whether the
+    // Redis credentials actually resolved, a silently-unenforced cap looks
+    // exactly like a working one.
+    const unlocked = isUnlocked(req);
+    // Today's usage is only disclosed to someone who's already past the gate,
+    // so it isn't a free readout of the demo's traffic for anyone who finds it.
+    const usage = unlocked ? await peekDailyUsage() : undefined;
+    res.status(200).json({
+      gateEnabled: gateEnabled(),
+      unlocked,
+      capsEnforced: capsEnforced(),
+      ...(usage ? { usage } : {}),
+    });
     return;
   }
 

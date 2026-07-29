@@ -187,10 +187,24 @@ export function requireUnlocked(req, res) {
 // Per-IP cap (Upstash Redis REST — optional)
 // ---------------------------------------------------------------------------
 
+// Two naming conventions in the wild, so accept both:
+//   UPSTASH_REDIS_REST_*  — what Upstash uses when you provision directly
+//   KV_REST_API_*         — what Vercel's Upstash Marketplace integration injects
+// Note KV_REST_API_READ_ONLY_TOKEN is deliberately NOT a fallback: the counters
+// need INCR, so a read-only token would fail every write.
+function redisConfig() {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
 function upstashConfigured() {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
-  );
+  return Boolean(redisConfig());
+}
+
+/** Whether the spend caps can actually enforce (i.e. Redis credentials resolved). */
+export function capsEnforced() {
+  return upstashConfigured();
 }
 
 export function clientIp(req) {
@@ -207,10 +221,12 @@ function ipKey(ip) {
 }
 
 async function upstash(command) {
-  const res = await fetch(process.env.UPSTASH_REDIS_REST_URL, {
+  const cfg = redisConfig();
+  if (!cfg) throw new Error("Redis not configured");
+  const res = await fetch(cfg.url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+      Authorization: `Bearer ${cfg.token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(command),
@@ -244,6 +260,23 @@ export async function checkAndCountDaily() {
   } catch (err) {
     console.warn("Daily cap check failed, allowing request:", err.message);
     return { allowed: true, enforced: false, used: 0, cap: DAILY_CALL_CAP };
+  }
+}
+
+/**
+ * Read today's usage without incrementing it — for the status readout in
+ * /api/auth. Uses GET rather than INCR so checking the number never changes it.
+ */
+export async function peekDailyUsage() {
+  if (!upstashConfigured()) return { enforced: false, used: null, cap: DAILY_CALL_CAP };
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    const { result } = await upstash(["GET", `ucl:daily:${day}`]);
+    return { enforced: true, used: Number(result) || 0, cap: DAILY_CALL_CAP, day };
+  } catch (err) {
+    // Credentials present but Redis unreachable — worth distinguishing from
+    // "not configured", since this is the case where caps silently don't work.
+    return { enforced: true, used: null, cap: DAILY_CALL_CAP, error: err.message };
   }
 }
 
