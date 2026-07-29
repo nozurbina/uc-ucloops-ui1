@@ -6,8 +6,8 @@ import {
   resolveTurns,
   setSessionCookie,
   checkAndCountIp,
+  checkAndCountDaily,
   requireUnlocked,
-  IP_WINDOW_DAYS,
 } from "./_limits.js";
 import { MAX_FILES } from "./upload.js";
 
@@ -148,11 +148,29 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Global daily ceiling, checked before the per-IP counter so a capped day
+    // doesn't consume anyone's personal allowance. Returned as HTTP 200 with a
+    // flag rather than a 4xx: this state is a deliberate part of the demo's
+    // experience (it becomes a "get in touch for full access" prompt), not an
+    // error the UI should render in red.
+    const daily = await checkAndCountDaily();
+    if (!daily.allowed) {
+      res.status(200).json({
+        demoCapReached: true,
+        turnsUsed: turns,
+        turnsMax: maxTurns,
+      });
+      return;
+    }
+
     // Per-IP cap (only enforced when Upstash is configured; fails open).
     const ipCheck = await checkAndCountIp(req);
     if (!ipCheck.allowed) {
-      res.status(429).json({
-        error: `You've used up this demo's allowance from your connection. It resets ${IP_WINDOW_DAYS} days after your first message.`,
+      res.status(200).json({
+        demoCapReached: true,
+        personalCap: true,
+        turnsUsed: turns,
+        turnsMax: maxTurns,
       });
       return;
     }

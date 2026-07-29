@@ -14,12 +14,18 @@ A free-demo chat interface for the ucLoops methodology, running on Claude Haiku 
 
 ### Demo limits
 
-| Limit | Value |
-|---|---|
-| Messages per conversation | 15 (personas) / 25 (assistants) |
-| Attachments per message | 3, 1MB each |
-| Per-IP cap | 60 model calls per rolling 3-day window *(only if Upstash is configured)* |
-| Output tokens per reply | 1200, hardcoded server-side |
+| Limit | Value | Needs Upstash |
+|---|---|---|
+| Shared password gate | `DEMO_PASSWORD` — unset disables it | no |
+| Messages per conversation | 15 (personas) / 25 (assistants) | no |
+| Attachments per message | 3, 1MB each | no |
+| Output tokens per reply | 1200, hardcoded server-side | no |
+| **Global daily cap** | **300 model calls per UTC day (`DEMO_DAILY_CALL_CAP`)** | **yes** |
+| Per-IP cap | 60 model calls per rolling 3-day window | yes |
+
+**What a conversation actually costs.** Measured against the live system prompts on Haiku 4.5: a persona's system prompt is ~14,300 tokens (Diego, the largest, ~18,700); the assistants are ~3,600. An *exhausted* conversation works out at roughly **30–60 cents**. The default 300-call daily cap therefore bounds a day at about $6–9.
+
+The global daily cap is the cost control that doesn't depend on a provider-side spend limit — useful because Anthropic's limits apply account-wide, not per key. When it trips, the UI shows a "due to popular demand" prompt inviting the visitor to get in touch for full access, rather than an error.
 
 **Disabled skills.** Several methodology skills are marked `(DISABLED IN FREE DEMO)` in the templates — `/p-create-page`, `/j-create-page`, `/j-suggest`, `/j-data`, `/persona-export`, `/create-index`, `/clean-index`. The agents will still *describe* what these do and when you'd reach for them, but won't run them or produce their deliverables. They're listed in the Available Skills panel with a "Not in demo" badge.
 
@@ -54,11 +60,18 @@ vercel dev
 2. Under **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` and `CHAT_SESSION_SECRET` (and the two `UPSTASH_*` vars if you want the per-IP cap).
 3. Deploy. Vercel auto-detects the Vite frontend and the `api/` folder — no extra config.
 
-### Adding the per-IP cap (optional)
+### Activating the spend caps (optional but recommended)
+
+The global daily cap and the per-IP cap both need a shared counter, which is the only thing Upstash is used for:
 
 1. Create a free Upstash Redis database (via the Vercel Marketplace integration or directly at upstash.com).
-2. Copy its **REST URL** and **REST token** into `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
-3. Redeploy. Tune `IP_TURN_CAP` and `IP_WINDOW_DAYS` at the top of `api/_limits.js`.
+2. Add its **REST URL** and **REST token** as `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
+3. Optionally set `DEMO_DAILY_CALL_CAP` (default 300).
+4. Redeploy.
+
+Both caps **fail open**: if Upstash isn't configured, or is configured but unreachable, requests are allowed through and a warning is logged. A demo that breaks because Redis blipped is worse than one that briefly over-serves. Verified in both cases.
+
+Tune `IP_TURN_CAP` / `IP_WINDOW_DAYS` at the top of `api/_limits.js`.
 
 ## Project structure
 

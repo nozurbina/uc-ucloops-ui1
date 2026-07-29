@@ -242,6 +242,8 @@ export default function AgentChat() {
   const [showSkills, setShowSkills] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
+  // { personalCap: bool } when the demo's shared daily allowance is spent.
+  const [demoCap, setDemoCap] = useState(null);
   const [skillQuery, setSkillQuery] = useState(null); // null = popup closed
   const [skillIndex, setSkillIndex] = useState(0);
 
@@ -297,11 +299,14 @@ export default function AgentChat() {
   useEffect(() => {
     // Wait for the gate check — priming while locked would just burn a 401.
     if (!gate.checked || gate.locked) return;
+    // Once the demo allowance is spent, don't keep firing priming calls for
+    // every agent the user clicks through.
+    if (demoCap) return;
     if (convo.initialized || convo.initializing || initStarted.current.has(activeId)) return;
     initStarted.current.add(activeId);
     runInitialize(activeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked]);
+  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked, demoCap]);
 
   async function runInitialize(agentId) {
     setConvos((prev) => ({ ...prev, [agentId]: { ...prev[agentId], initializing: true } }));
@@ -314,6 +319,22 @@ export default function AgentChat() {
         body: JSON.stringify({ agentId, messages: [initMsg], init: true }),
       });
       const data = await res.json();
+      if (res.status === 401 && data.locked) {
+        setGate({ checked: true, locked: true });
+        setConvos((prev) => ({
+          ...prev,
+          [agentId]: { ...prev[agentId], initializing: false },
+        }));
+        return;
+      }
+      if (data.demoCapReached) {
+        setDemoCap({ personalCap: Boolean(data.personalCap) });
+        setConvos((prev) => ({
+          ...prev,
+          [agentId]: { ...prev[agentId], initialized: true, initializing: false },
+        }));
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Request failed");
 
       setConvos((prev) => ({
@@ -384,7 +405,14 @@ export default function AgentChat() {
 
   async function send() {
     const text = draft.trim();
-    if ((!text && !attachments.length) || sending || convo.limitReached || convo.initializing) return;
+    if (
+      (!text && !attachments.length) ||
+      sending ||
+      convo.limitReached ||
+      convo.initializing ||
+      demoCap
+    )
+      return;
     setError(null);
     setSkillQuery(null);
 
@@ -414,6 +442,12 @@ export default function AgentChat() {
       // password screen rather than showing a bare error.
       if (res.status === 401 && data.locked) {
         setGate({ checked: true, locked: true });
+        return;
+      }
+      // Shared daily allowance spent — becomes a "get in touch" prompt rather
+      // than an error, and the user's message stays in the transcript.
+      if (data.demoCapReached) {
+        setDemoCap({ personalCap: Boolean(data.personalCap) });
         return;
       }
       if (!res.ok) throw new Error(data.error || "Request failed");
@@ -1189,7 +1223,89 @@ export default function AgentChat() {
                 </div>
               )}
 
-              {convo.limitReached ? (
+              {demoCap ? (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg,#f7f2fa,#fdf8ee)",
+                    border: "1px solid #e2d4e8",
+                    borderLeft: "5px solid var(--purple)",
+                    borderRadius: 12,
+                    padding: "1.1rem 1.25rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: ".68rem",
+                      fontWeight: 700,
+                      letterSpacing: ".12em",
+                      textTransform: "uppercase",
+                      color: "var(--purple)",
+                      marginBottom: ".4rem",
+                    }}
+                  >
+                    Due to popular demand
+                  </div>
+                  <p
+                    style={{
+                      margin: "0 0 .5rem",
+                      fontSize: ".95rem",
+                      fontWeight: 600,
+                      color: "var(--slate)",
+                    }}
+                  >
+                    {demoCap.personalCap
+                      ? "You've explored a good chunk of this demo — thanks for giving it a proper go."
+                      : "This free demo has reached today's shared limit."}
+                  </p>
+                  <p
+                    style={{
+                      margin: "0 0 .9rem",
+                      fontSize: ".87rem",
+                      color: "var(--text-muted)",
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    The demo runs on a capped allowance so it stays free for everyone. Want
+                    unlimited access, your own personas built from your real research, and the
+                    skills that are switched off here? That's what the full version does — get in
+                    touch and we'll set you up.
+                    {!demoCap.personalCap && " Or come back tomorrow when the allowance resets."}
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
+                    <a
+                      href="mailto:ucloops@urbinaconsulting.com?subject=Unlocked%20ucLoops%20demo%20access"
+                      style={{
+                        background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
+                        color: "var(--purple-deep)",
+                        borderRadius: 999,
+                        padding: ".5rem 1.2rem",
+                        fontWeight: 700,
+                        fontSize: ".85rem",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Request full access
+                    </a>
+                    <a
+                      href="https://urbinaconsulting.com/ucloops"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #d9c9e2",
+                        color: "var(--purple)",
+                        borderRadius: 999,
+                        padding: ".5rem 1.2rem",
+                        fontWeight: 700,
+                        fontSize: ".85rem",
+                        textDecoration: "none",
+                      }}
+                    >
+                      About ucLoops training
+                    </a>
+                  </div>
+                </div>
+              ) : convo.limitReached ? (
                 <div
                   style={{
                     display: "flex",

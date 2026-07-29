@@ -22,6 +22,13 @@ export const IP_WINDOW_DAYS = 3;
 export const IP_TURN_CAP = 60; // total model calls per IP per 3-day window
 const IP_WINDOW_SECONDS = IP_WINDOW_DAYS * 24 * 60 * 60;
 
+// Global ceiling on model calls per calendar day (UTC), across every visitor.
+// This is the cost backstop that doesn't depend on any provider-side spend
+// limit: whatever else happens, the demo cannot make more than this many calls
+// in a day. At Haiku rates a call averages roughly 2-3 cents, so the default
+// bounds a day at single-digit dollars. Override with DEMO_DAILY_CALL_CAP.
+export const DAILY_CALL_CAP = Number(process.env.DEMO_DAILY_CALL_CAP) || 300;
+
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6h — long enough for a sitting
 export const COOKIE_NAME = "ucl_sess";
 
@@ -211,6 +218,33 @@ async function upstash(command) {
   });
   if (!res.ok) throw new Error(`Upstash ${res.status}`);
   return res.json();
+}
+
+/**
+ * Global daily ceiling on model calls, shared across all visitors.
+ *
+ * Uses a fixed UTC-day bucket rather than a rolling window so that "try again
+ * tomorrow" is literally true — a rolling window would trickle capacity back in
+ * unpredictably and make the message a lie.
+ *
+ * Fails open, like the per-IP cap: an outage shouldn't take the demo down.
+ */
+export async function checkAndCountDaily() {
+  if (!upstashConfigured()) {
+    return { allowed: true, enforced: false, used: 0, cap: DAILY_CALL_CAP };
+  }
+
+  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD, UTC
+  const key = `ucl:daily:${day}`;
+  try {
+    const { result: used } = await upstash(["INCR", key]);
+    // 48h TTL: comfortably past the day's end, and self-cleaning.
+    if (used === 1) await upstash(["EXPIRE", key, "172800"]);
+    return { allowed: used <= DAILY_CALL_CAP, enforced: true, used, cap: DAILY_CALL_CAP };
+  } catch (err) {
+    console.warn("Daily cap check failed, allowing request:", err.message);
+    return { allowed: true, enforced: false, used: 0, cap: DAILY_CALL_CAP };
+  }
 }
 
 /**
