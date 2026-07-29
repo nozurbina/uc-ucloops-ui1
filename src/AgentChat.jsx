@@ -16,6 +16,23 @@ const EVIDENCE_MAP_URL = "https://urbinaconsulting.com/shares/ucloops/borderblen
 const MAX_FILES = 3;
 const MAX_FILE_BYTES = 1024 * 1024;
 
+/**
+ * `?agent=<id>` deep link, used by the evidence-map site so a persona page or a
+ * journey sidebar can open straight into a conversation with that persona.
+ * Returns null for a missing or unrecognised id, which lands on the overview
+ * instead — a bad link should never boot into the wrong persona.
+ */
+function readAgentFromUrl() {
+  if (typeof window === "undefined") return null;
+  try {
+    const id = new URLSearchParams(window.location.search).get("agent");
+    if (!id) return null;
+    return AGENT_META.some((a) => a.id === id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 const THEME = {
   "--purple-deep": "#500850",
   "--purple": "#750675",
@@ -340,14 +357,20 @@ function PasswordGate({ onUnlock }) {
 
 export default function AgentChat() {
   const [gate, setGate] = useState({ checked: false, locked: false });
-  const [activeId, setActiveId] = useState(PERSONA_META[0].id);
+  // Read once on mount. A deep link names the agent; without one we start on the
+  // overview, so `activeId` is only a fallback for when the user picks nothing.
+  const [deepLinked] = useState(readAgentFromUrl);
+  const [activeId, setActiveId] = useState(deepLinked ?? PERSONA_META[0].id);
   const [convos, setConvos] = useState(initialConvos);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [showSources, setShowSources] = useState(false);
   const [showSkills, setShowSkills] = useState(false);
-  const [showWorkflow, setShowWorkflow] = useState(false);
+  // The overview is the default view: arriving cold, the loops are what make the
+  // agent list legible. A deep link means the choice is already made, so it goes
+  // straight to that agent's chat.
+  const [landing, setLanding] = useState(!deepLinked);
   const isNarrow = useIsNarrow();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [attachments, setAttachments] = useState([]);
@@ -409,6 +432,9 @@ export default function AgentChat() {
   useEffect(() => {
     // Wait for the gate check — priming while locked would just burn a 401.
     if (!gate.checked || gate.locked) return;
+    // On the overview no agent has been chosen yet. Priming here would spend a
+    // real API call on a persona the visitor may never open.
+    if (landing) return;
     // Once the demo allowance is spent, don't keep firing priming calls for
     // every agent the user clicks through.
     if (demoCap) return;
@@ -416,7 +442,7 @@ export default function AgentChat() {
     initStarted.current.add(activeId);
     runInitialize(activeId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked, demoCap]);
+  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked, demoCap, landing]);
 
   async function runInitialize(agentId) {
     setConvos((prev) => ({ ...prev, [agentId]: { ...prev[agentId], initializing: true } }));
@@ -590,11 +616,19 @@ export default function AgentChat() {
   }
 
   function useStarter(starter) {
+    if (starter.action === "overview") {
+      // Interface action, not a message. The conversation stays exactly where it
+      // is — the sidebar card comes back to it.
+      setLanding(true);
+      setShowSkills(false);
+      setShowSources(false);
+      return;
+    }
     if (starter.action === "sources") {
       // An interface action, not a message — costs no turns and no tokens.
       setShowSources(true);
       setShowSkills(false);
-      setShowWorkflow(false);
+      setLanding(false);
       return;
     }
     if (starter.fill) {
@@ -618,7 +652,7 @@ export default function AgentChat() {
     setActiveId(id);
     setShowSources(false);
     setShowSkills(false);
-    setShowWorkflow(false);
+    setLanding(false);
     setSkillQuery(null);
     setAttachments([]);
     setError(null);
@@ -773,23 +807,27 @@ export default function AgentChat() {
           <span>{isNarrow ? "Evidence Map" : "Back to BorderBlend Evidence Map"}</span>
         </a>
         {isNarrow && <span style={{ flex: 1 }} />}
+        {/* Both of these are scoped to whoever you're talking to, so they'd be
+            meaningless on the overview — there is no active agent yet. */}
+        {!landing && (
         <button
           onClick={() => {
             setShowSkills((v) => !v);
             setShowSources(false);
-            setShowWorkflow(false);
+            setLanding(false);
           }}
           style={barButtonStyle}
         >
           Available skills <span style={{ opacity: 0.7 }}>{skills.length}</span>{" "}
           {showSkills ? "▲" : "▼"}
         </button>
-        {active.sources.length > 0 && (
+        )}
+        {!landing && active.sources.length > 0 && (
           <button
             onClick={() => {
               setShowSources((v) => !v);
               setShowSkills(false);
-              setShowWorkflow(false);
+              setLanding(false);
             }}
             style={barButtonStyle}
           >
@@ -888,9 +926,10 @@ export default function AgentChat() {
           <div style={{ padding: ".85rem .75rem .25rem" }}>
             <button
               onClick={() => {
-                setShowWorkflow((v) => !v);
+                setLanding(true);
                 setShowSkills(false);
                 setShowSources(false);
+                if (isNarrow) setSidebarOpen(false);
               }}
               style={{
                 width: "100%",
@@ -902,13 +941,13 @@ export default function AgentChat() {
                 borderRadius: 10,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                background: showWorkflow
+                background: landing
                   ? "linear-gradient(180deg,var(--gold-bright),var(--gold))"
                   : "rgba(255,255,255,.07)",
-                border: showWorkflow
+                border: landing
                   ? "1px solid var(--gold)"
                   : "1px dashed rgba(232,188,82,.55)",
-                color: showWorkflow ? "var(--purple-deep)" : "#fff",
+                color: landing ? "var(--purple-deep)" : "#fff",
                 transition: "background .15s, border-color .15s",
               }}
             >
@@ -920,7 +959,7 @@ export default function AgentChat() {
                 <div
                   style={{
                     fontSize: ".71rem",
-                    color: showWorkflow ? "rgba(80,8,80,.75)" : "rgba(255,255,255,.6)",
+                    color: landing ? "rgba(80,8,80,.75)" : "rgba(255,255,255,.6)",
                     lineHeight: 1.35,
                   }}
                 >
@@ -928,7 +967,7 @@ export default function AgentChat() {
                 </div>
               </span>
               <span style={{ fontSize: ".7rem", opacity: 0.7, flexShrink: 0 }}>
-                {showWorkflow ? "▲" : "▶"}
+                {landing ? "●" : "▶"}
               </span>
             </button>
             <div
@@ -1042,7 +1081,13 @@ export default function AgentChat() {
               }}
             >
               <span style={{ fontSize: "1rem", lineHeight: 1 }}>☰</span>
-              <AgentAvatar agent={active} size={24} ring={false} />
+              {/* On the overview there is no active agent, so showing an avatar
+                  and "Now: Omar" would claim a conversation that isn't open. */}
+              {landing ? (
+                <span style={{ fontSize: "1rem", lineHeight: 1 }}>🔄</span>
+              ) : (
+                <AgentAvatar agent={active} size={24} ring={false} />
+              )}
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: ".78rem", fontWeight: 700 }}>
                   Open to chat with agents
@@ -1057,7 +1102,7 @@ export default function AgentChat() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  Now: {active.name}
+                  {landing ? "Reading the overview" : `Now: ${active.name}`}
                 </span>
               </span>
               <span style={{ fontSize: ".7rem", opacity: 0.6 }}>▶</span>
@@ -1154,28 +1199,89 @@ export default function AgentChat() {
             </button>
           </header>
 
-          {/* How it works — the ucLoops workflow */}
-          {showWorkflow && (
-            <ScrollPanel
-              maxHeight="75vh"
-              fadeColor="#f5f5f5"
-              padding="1.1rem 1.5rem"
+          {/* The overview, as the full page rather than a panel dropping from the
+              top. It's the first thing you see, so it gets the whole column —
+              squeezing it into a 75vh drawer over a chat you hadn't started made
+              it read as a reference popup instead of the starting point. */}
+          {landing && (
+            <div
+              className="uc-scroll"
               style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
                 background: "var(--bg)",
-                borderBottom: "2px solid var(--gold)",
-                flexShrink: 0,
+                padding: isNarrow ? "1.25rem 1rem 2rem" : "1.75rem 1.5rem 2.5rem",
               }}
             >
               <WorkflowDiagram
                 onPickSkill={(command) => {
+                  // Picking a skill is a decision to start working, so it leaves
+                  // the overview and drops the command into the composer.
                   setDraft((d) => (d ? d + " " : "") + command + " ");
-                  setShowWorkflow(false);
-                  inputRef.current?.focus();
+                  setLanding(false);
+                  requestAnimationFrame(() => inputRef.current?.focus());
                 }}
               />
-            </ScrollPanel>
+              <div
+                style={{
+                  maxWidth: 880,
+                  margin: "1.5rem auto 0",
+                  padding: "1rem 1.1rem",
+                  background: "#fff",
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: ".88rem",
+                    fontWeight: 700,
+                    color: "var(--slate)",
+                    marginBottom: ".2rem",
+                  }}
+                >
+                  Ready to try it?
+                </div>
+                <div
+                  style={{
+                    fontSize: ".8rem",
+                    color: "var(--text-muted)",
+                    marginBottom: ".85rem",
+                  }}
+                >
+                  {isNarrow
+                    ? "Open the agent list and pick someone to talk to."
+                    : "Pick an agent from the list on the left, or start with a persona interview."}
+                </div>
+                <button
+                  onClick={() => {
+                    if (isNarrow) setSidebarOpen(true);
+                    else switchAgent(PERSONA_META[0].id);
+                  }}
+                  style={{
+                    background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
+                    border: "1px solid var(--gold)",
+                    borderRadius: 999,
+                    color: "var(--purple-deep)",
+                    padding: ".5rem 1.1rem",
+                    fontSize: ".82rem",
+                    fontWeight: 700,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isNarrow
+                    ? "☰ Choose an agent"
+                    : `Start with ${PERSONA_META[0].name} →`}
+                </button>
+              </div>
+            </div>
           )}
 
+          {!landing && (
+            <>
           {/* Available skills panel */}
           {showSkills && (
             <ScrollPanel
@@ -1947,6 +2053,8 @@ export default function AgentChat() {
               </div>
             </div>
           </div>
+            </>
+          )}
         </main>
       </div>
 

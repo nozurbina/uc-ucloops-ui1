@@ -350,6 +350,16 @@ export const STARTERS_BY_AGENT = {
 const ROTATES = new Set(["omar", "grace", "mateo", "diego", "tyler"]);
 const ROTATE_COUNT = 2;
 
+// Shown first for every agent. People arriving from a deep link on the evidence
+// map skip the overview entirely, so this is their route back to "what is this
+// and how was it made?" — asked of the agent in front of them, which is how the
+// question actually occurs to you. Costs no turns and no tokens.
+const OVERVIEW_STARTER = {
+  label: "How were you created?",
+  hint: "Get an overview of ucLoops — the method behind me",
+  action: "overview",
+};
+
 /**
  * @param agentId  which agent's starters to build
  * @param seed     0-1, fixed per conversation. Same seed gives the same cards,
@@ -358,7 +368,7 @@ const ROTATE_COUNT = 2;
  */
 export function startersForAgent(agentId, seed = 0.5) {
   const base = STARTERS_BY_AGENT[agentId] ?? [];
-  if (!ROTATES.has(agentId)) return base;
+  if (!ROTATES.has(agentId)) return [OVERVIEW_STARTER, ...base];
 
   // Two pools, drawn independently: questions specific to this persona, and
   // questions that suit any of them. The shared pool uses a derived seed so it
@@ -373,5 +383,5 @@ export function startersForAgent(agentId, seed = 0.5) {
   const actionCards = base.filter((s) => s.action);
   const skillCards = base.filter((s) => !s.action && isSkill(s));
 
-  return [...personaPicks, ...sharedPicks, ...skillCards, ...actionCards];
+  return [OVERVIEW_STARTER, ...personaPicks, ...sharedPicks, ...skillCards, ...actionCards];
 }
