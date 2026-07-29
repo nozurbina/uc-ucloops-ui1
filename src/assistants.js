@@ -12,6 +12,7 @@ import {
   SHARED_SKILLS,
   TRANSCRIPT_CLEANUP_SKILL,
 } from "./templates.generated.js";
+import { BORDERBLEND_CASE_CONTEXT } from "./caseContext.js";
 
 const JOIN = `
 
@@ -25,7 +26,7 @@ export const ASSISTANTS = [
     emoji: "🧭",
     type: "assistant",
     builtin: true,
-    description: UX_ASSISTANT_TEMPLATE + JOIN + SHARED_SKILLS,
+    description: UX_ASSISTANT_TEMPLATE + JOIN + SHARED_SKILLS + JOIN + BORDERBLEND_CASE_CONTEXT,
   },
   {
     id: "data",
@@ -45,6 +46,8 @@ export const ASSISTANTS = [
       `# /transcript-cleanup SKILL (referenced by the SKILLS list above)
 
 ` +
-      TRANSCRIPT_CLEANUP_SKILL,
+      TRANSCRIPT_CLEANUP_SKILL +
+      JOIN +
+      BORDERBLEND_CASE_CONTEXT,
   },
 ];

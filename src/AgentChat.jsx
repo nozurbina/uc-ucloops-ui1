@@ -9,6 +9,7 @@ import {
   sourceWordTotal,
 } from "./agentMeta.js";
 import { skillsForAgent, groupedSkillsForAgent, WORKFLOW_CHAIN } from "./skills.js";
+import { startersForAgent } from "./starters.js";
 
 const EVIDENCE_MAP_URL = "https://urbinaconsulting.com/shares/ucloops/borderblend/";
 const MAX_FILES = 3;
@@ -403,8 +404,10 @@ export default function AgentChat() {
     }
   }
 
-  async function send() {
-    const text = draft.trim();
+  // `overrideText` lets a conversation starter send directly without first
+  // round-tripping through the composer's state.
+  async function send(overrideText) {
+    const text = (overrideText ?? draft).trim();
     if (
       (!text && !attachments.length) ||
       sending ||
@@ -477,6 +480,17 @@ export default function AgentChat() {
     }
   }
 
+  function useStarter(starter) {
+    if (starter.fill) {
+      // Needs the user to add something (a transcript, a challenge) — hand them
+      // the composer rather than sending an incomplete request.
+      setDraft(starter.prompt);
+      inputRef.current?.focus();
+    } else {
+      send(starter.prompt);
+    }
+  }
+
   function resetConversation() {
     initStarted.current.delete(activeId);
     setConvos((prev) => ({ ...prev, [activeId]: emptyConvo(active.maxTurns) }));
@@ -543,6 +557,19 @@ export default function AgentChat() {
   }
 
   const inputDisabled = sending || convo.initializing;
+
+  // Starters are for the top of a conversation only — they disappear as soon as
+  // the user has actually said something.
+  const hasUserMessage = convo.messages.some((m) => m.role === "user" && !m.hidden);
+  const showStarters =
+    gate.checked &&
+    !gate.locked &&
+    !demoCap &&
+    !convo.limitReached &&
+    convo.initialized &&
+    !convo.initializing &&
+    !hasUserMessage &&
+    !sending;
 
   if (!gate.checked) {
     return (
@@ -1120,6 +1147,69 @@ export default function AgentChat() {
                     }}
                   >
                     {active.name} is typing…
+                  </div>
+                </div>
+              )}
+
+              {showStarters && (
+                <div style={{ marginTop: ".25rem", paddingLeft: "2.1rem" }}>
+                  <div
+                    style={{
+                      fontSize: ".66rem",
+                      fontWeight: 700,
+                      letterSpacing: ".12em",
+                      textTransform: "uppercase",
+                      color: "var(--text-muted)",
+                      marginBottom: ".55rem",
+                    }}
+                  >
+                    Try one of these
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
+                    {startersForAgent(activeId).map((s) => (
+                      <button
+                        key={s.label}
+                        onClick={() => useStarter(s)}
+                        style={{
+                          textAlign: "left",
+                          background: "var(--bg-card)",
+                          border: "1px solid var(--border)",
+                          borderLeft: "3px solid var(--gold)",
+                          borderRadius: 10,
+                          padding: ".55rem .8rem",
+                          cursor: "pointer",
+                          maxWidth: 330,
+                          boxShadow: "0 1px 3px rgba(0,0,0,.04)",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: ".84rem",
+                            fontWeight: 600,
+                            color: "var(--slate)",
+                            marginBottom: ".12rem",
+                          }}
+                        >
+                          {s.label}
+                          {s.fill && (
+                            <span
+                              style={{
+                                marginLeft: ".35rem",
+                                fontWeight: 500,
+                                fontSize: ".7rem",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              →
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: ".74rem", color: "var(--text-muted)" }}>
+                          {s.hint}
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
