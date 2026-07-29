@@ -186,9 +186,9 @@ export const STARTERS_BY_AGENT = {
       hint: "Stages, goals, tasks, and decision gates",
     },
     {
-      label: "Turn a persona into user stories",
+      label: "Turn a journey into user stories",
       prompt:
-        "/stories for Omar across his whole journey. Work from the persona summary you already have and flag any inferences as assumptions.",
+        "/stories for Omar across his whole journey. Organise them by journey stage and flag any assumptions that you make that go beyond the source data.",
       hint: "With acceptance criteria and priority signals",
     },
     {
@@ -200,7 +200,7 @@ export const STARTERS_BY_AGENT = {
     {
       label: "Work through a design challenge",
       prompt: "/ideate ",
-      hint: "Describe the challenge — I'll be direct about trade-offs",
+      hint: "Describe the challengeor idea. I'll be direct about trade-offs",
       fill: true,
     },
   ],
@@ -209,19 +209,19 @@ export const STARTERS_BY_AGENT = {
     {
       label: "Clean up a transcript",
       prompt: "/transcript-cleanup ",
-      hint: "Paste or attach it — I'll structure it and keep the verbatims",
+      hint: "Paste or attach it. I'll ask you to confirm key nouns and then structure it, keeping the verbatims",
       fill: true,
     },
     {
       label: "Suggest personas for a scenario",
       prompt:
-        "/personas Canadian food trucks, weekday lunch ordering. Go ahead and suggest 4-5 personas now using your best assumptions — flag them as assumptions rather than asking me first.",
+        "/personas Pharmaceutical drug trial participants with diverse backgrounds, emotional context, and digital literacy. Suggest 4-5 personas now using your best assumptions — flag them as assumptions rather than asking me first.",
       hint: "Roles, goals, tasks, and pain points",
     },
     {
       label: "Build personas from my research",
       prompt: "I have research I'd like to build personas from — where do we start?",
-      hint: "Synthesise rather than invent",
+      hint: "Consolidate rather than invent",
     },
     {
       label: "Show me what you can do",

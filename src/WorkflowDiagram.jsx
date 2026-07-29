@@ -50,7 +50,7 @@ export default function WorkflowDiagram({ onPickSkill }) {
           color: "var(--slate)",
         }}
       >
-        How research becomes a journey map
+        How to work with ucLoops
       </p>
       <p
         style={{
@@ -60,9 +60,8 @@ export default function WorkflowDiagram({ onPickSkill }) {
           lineHeight: 1.55,
         }}
       >
-        Each loop hands its output to the next. Different agents own different
-        loops — that's why you switch between them in the sidebar rather than
-        asking one thing to do everything.
+        ucLoops supports working real evidence, augmented by AI when there are gaps. Each stage of the workflow is a loop hands its output to the next. Different agents support different
+        loops, that's why you switch between them in the sidebar rather than asking one agent to do everything. Humans are the loop. You're always in control and can decide how much of the results are anchored in your data or generated with AI.
       </p>
 
       {disabledCount > 0 && (
@@ -85,7 +84,7 @@ export default function WorkflowDiagram({ onPickSkill }) {
           <span>
             <strong>{disabledCount} skills marked ✕ aren't switched on in this free demo.</strong>{" "}
             The agents will still explain what each one does and when you'd reach for
-            it — they just won't produce the deliverable. Everything unmarked works
+            it — they just won't produce the deliverable. Everything else works
             normally.
           </span>
         </div>

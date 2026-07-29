@@ -23,18 +23,18 @@ const SHARED_SKILLS_CATALOGUE = [
     command: "/learn",
     group: "Getting started",
     description: "Add context or background information to the current conversation",
-    example: "/learn Our target audience is weekday office workers downtown",
+    example: "/learn Your favourite colour is violet",
   },
   {
     command: "/sticky",
     group: "Formatting & output",
-    description: "Rewrite output as short sticky-note fragments for whiteboarding",
+    description: "Rewrite output as short sticky-note fragments suitable for whiteboarding",
     example: "/sticky",
   },
   {
     command: "/summary",
     group: "Formatting & output",
-    description: "Create a summary document of everything discussed in this conversation",
+    description: "Create a structured summary of everything discussed in this conversation",
     example: "/summary",
   },
   {
@@ -64,8 +64,8 @@ const PERSONA_SKILLS = [
     command: "/j-stage",
     group: "Journey mapping",
     description:
-      "Map one stage of my journey — goals, narrative, questions, problems, tasks, sentiment, a quote in my voice, alternate paths, and channels",
-    example: "/j-stage The stage where I first hear about the brand",
+      "Map one stage of journey stage based on the context you suggest. Includes goals, narrative, questions, channels, and more",
+    example: "/j-stage You've just been presented with this [new situation]",
   },
   {
     command: "/j-questions",
@@ -77,8 +77,8 @@ const PERSONA_SKILLS = [
     command: "/ideate",
     group: "Ideation",
     description:
-      "Work through a challenge with me — I'll be frank about pros, cons, and risks rather than agreeable",
-    example: "/ideate How could we make ordering faster at peak times?",
+      "Work through a challenge with me — I'll be frank about pros, cons, and risks",
+    example: "/ideate What would make you sign up to receive emails from our brand?",
   },
   ...SHARED_SKILLS_CATALOGUE,
 ];
@@ -93,8 +93,8 @@ const UX_SKILLS = [
   {
     command: "/j-outline",
     group: "Journey mapping",
-    description: "Create a journey outline with stages, goals, tasks, and decision gates",
-    example: "/j-outline Omar's journey from first hearing about the brand to becoming a regular",
+    description: "Create a journey outline with stages, goals, tasks, and decision gates. Can be persona specific or general",
+    example: "/j-outline Omar's (or 'A customer') journey from first hearing about the brand to becoming a regular",
   },
   {
     command: "/j-multi-outline",

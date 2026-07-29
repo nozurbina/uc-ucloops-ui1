@@ -948,7 +948,7 @@ export default function AgentChat() {
                 borderBottom: "2px solid var(--gold)",
                 padding: "1.1rem 1.5rem",
                 flexShrink: 0,
-                maxHeight: "58vh",
+                maxHeight: "75vh",
                 overflowY: "auto",
               }}
             >
