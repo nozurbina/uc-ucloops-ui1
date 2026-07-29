@@ -67,6 +67,10 @@ function emptyConvo(maxTurns) {
     limitReached: false,
     initialized: false,
     initializing: false,
+    // Fixes which questions get rotated into the starters for this
+    // conversation. Set once here so the cards stay put while you type, and
+    // change only when a new conversation begins.
+    starterSeed: Math.random(),
   };
 }
 
@@ -1295,7 +1299,7 @@ export default function AgentChat() {
                     Try one of these
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
-                    {startersForAgent(activeId).map((s) => (
+                    {startersForAgent(activeId, convo.starterSeed).map((s) => (
                       <button
                         key={s.label}
                         onClick={() => useStarter(s)}

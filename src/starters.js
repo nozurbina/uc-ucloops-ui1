@@ -7,6 +7,68 @@
 // clean, a challenge to critique), so clicking it puts the text in the composer
 // with focus rather than sending straight away. Everything else sends on click.
 
+// Questions that work for any persona. Two are rotated in per conversation so
+// the demo doesn't feel scripted, and so someone who tries several personas —
+// or restarts one — sees different ways in rather than the same five cards.
+//
+// Normalised to second person throughout (the user is addressing the persona);
+// two of the supplied drafts were third-person or had a typo.
+const SHARED_QUESTION_POOL = [
+  {
+    label: "How do you decide where to eat?",
+    prompt: "How do you make decisions about where to eat?",
+    hint: "The actual decision process",
+  },
+  {
+    label: "Where do you hear about new places?",
+    prompt: "Where do you hear about new restaurants or food trucks?",
+    hint: "Which channels actually reach you",
+  },
+  {
+    label: "How should BorderBlend talk to you?",
+    prompt: "How should BorderBlend talk to you?",
+    hint: "Tone, channel, and frequency that would land",
+  },
+  {
+    label: "What would make you sign up for something?",
+    prompt: "Under what conditions would you sign up for something?",
+    hint: "What it takes to get an opt-in",
+  },
+  {
+    label: "What would make you walk away?",
+    prompt: "What would make you walk away from BorderBlend?",
+    hint: "The dealbreakers",
+  },
+  {
+    label: "Who are you actually ordering for?",
+    prompt: "Who are you actually ordering for?",
+    hint: "Rarely just themselves",
+  },
+  {
+    label: "Is the fusion the point, or is it just tacos?",
+    prompt: "The fusion — is that the point for you, or is it just tacos?",
+    hint: "The strategic question behind the brand",
+  },
+  {
+    label: "How have your experiences been so far?",
+    prompt: "How have your experiences with BorderBlend been so far?",
+    hint: "Their history with the brand",
+  },
+];
+
+// Deterministic pick so cards don't reshuffle on every keystroke — the seed is
+// fixed per conversation and only changes when a new conversation starts.
+function pickFromPool(pool, count, seed) {
+  const remaining = [...pool];
+  const chosen = [];
+  let s = Math.floor(seed * 233280) || 1;
+  for (let i = 0; i < count && remaining.length; i++) {
+    s = (s * 9301 + 49297) % 233280;
+    chosen.push(remaining.splice(Math.floor((s / 233280) * remaining.length), 1)[0]);
+  }
+  return chosen;
+}
+
 // The stage to map varies by persona — "when you first came across BorderBlend"
 // is ambiguous for Diego, who encountered it as a prospective franchisee rather
 // than a customer.
@@ -20,18 +82,15 @@ function personaCommon(stageDescription) {
     {
       label: "Map a journey stage",
       prompt: `/j-stage ${stageDescription}`,
-      hint: "In your own voice: goals, problems, sentiment, and a quote",
+      // Hints are written from the persona's side, since it's the persona
+      // speaking on these cards — "my" voice, not "your" voice.
+      hint: "In my own voice: goals, problems, sentiment, and a quote",
     },
     {
       label: "Push back on an idea",
       prompt: "/ideate ",
       hint: "Describe a change and I'll be frank about it",
       fill: true,
-    },
-    {
-      label: "What should we be asking?",
-      prompt: "What questions should we be asking about your experience that we haven't yet?",
-      hint: "Research questions I'd want answered",
     },
   ];
 }
@@ -52,11 +111,6 @@ export const STARTERS_BY_AGENT = {
       label: "Walk me through a typical weekday lunch",
       prompt: "Walk me through a typical weekday lunch — start to finish.",
       hint: "How the routine actually works",
-    },
-    {
-      label: "What would make you stop coming?",
-      prompt: "What would make you stop coming to BorderBlend?",
-      hint: "The things that would break the habit",
     },
     ...personaCommon(CONSUMER_STAGE),
   ],
@@ -100,11 +154,6 @@ export const STARTERS_BY_AGENT = {
     ...personaCommon(FRANCHISEE_STAGE),
   ],
   tyler: [
-    {
-      label: "How do you decide where to eat?",
-      prompt: "How do you actually decide where to eat when you're hungry?",
-      hint: "The (very short) decision process",
-    },
     {
       label: "What would make you a regular?",
       prompt: "What would it take for you to become a regular somewhere?",
@@ -171,6 +220,25 @@ export const STARTERS_BY_AGENT = {
   ],
 };
 
-export function startersForAgent(agentId) {
-  return STARTERS_BY_AGENT[agentId] ?? [];
+// Which agents get questions rotated in from the shared pool. The assistants
+// don't — those questions are addressed to a research subject, not to a tool.
+const ROTATES = new Set(["omar", "grace", "mateo", "diego", "tyler"]);
+const ROTATE_COUNT = 2;
+
+/**
+ * @param agentId  which agent's starters to build
+ * @param seed     0-1, fixed per conversation. Same seed gives the same cards,
+ *                 so they don't reshuffle mid-conversation; a new conversation
+ *                 gets a new seed and therefore different questions.
+ */
+export function startersForAgent(agentId, seed = 0.5) {
+  const base = STARTERS_BY_AGENT[agentId] ?? [];
+  if (!ROTATES.has(agentId)) return base;
+
+  // Rotated questions sit after the persona-specific openers but before the
+  // skill cards, so the ordering stays: about you → about you → run a skill.
+  const rotated = pickFromPool(SHARED_QUESTION_POOL, ROTATE_COUNT, seed);
+  const skillCards = base.filter((s) => s.prompt.trim().startsWith("/"));
+  const questionCards = base.filter((s) => !s.prompt.trim().startsWith("/"));
+  return [...questionCards, ...rotated, ...skillCards];
 }
