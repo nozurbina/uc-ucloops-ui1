@@ -11,15 +11,15 @@
 // is ambiguous for Diego, who encountered it as a prospective franchisee rather
 // than a customer.
 //
-// Phrased as natural language rather than "/j-stage <context>": the templates
-// explicitly support inferring a skill from intent, and a slash command with
-// prose trailing it on the same line tends to get misread as a malformed
-// command rather than a command plus its context.
+// Uses the slash form, which is worth modelling for users since it's the syntax
+// they'd type in their own tools. /j-questions is the exception: the template
+// scopes it to "this stage", so as an opening message — with no stage discussed
+// yet — a plain question gets a better answer than a bare command.
 function personaCommon(stageDescription) {
   return [
     {
       label: "Map a journey stage",
-      prompt: `Map out ${stageDescription}, using your j-stage format.`,
+      prompt: `/j-stage ${stageDescription}`,
       hint: "In your own voice: goals, problems, sentiment, and a quote",
     },
     {
