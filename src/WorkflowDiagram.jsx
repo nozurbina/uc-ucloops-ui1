@@ -64,11 +64,14 @@ export default function WorkflowDiagram({ onPickSkill }) {
         ucLoops is an AI methodology you can use on your own machine with no software besides the AI tools (Claude, ChatGPT, Grok, etc) that you use today. It is a strategy and experience design system that supports working real evidence, augmented by AI when there are gaps.
       </p>
       <p style={INTRO_P}>
-        People use it to create strategies and designs for marketing, sales, knowledge, and user experience. Each stage of the workflow is a loop hands its output to the next. Different agents support different
-        loops, that's why you switch between them in the sidebar rather than asking one agent to do everything.
+        People use it to create strategies and designs for marketing, sales, knowledge, content, and product experience. Each stage of the workflow is a loop that hands off its output to the next. Different agents support different
+        loops. You can switch between agents in the sidebar.
       </p>
       <p style={INTRO_P}>
         <strong>Humans are the loop.</strong> You're always in control and can decide how much of the results are anchored in your data or generated with AI and how much analysis is hands-on vs automated.
+      </p>
+      <p style={INTRO_P}>
+        <strong>This demo content is synthetic. Although we strongly advocate the use of <a href="https://urbinaconsulting.com/ai/synthetic-users-vs-persona-simulations/">real research for simulating personas</a>, all data in this demo is AI-generated.</strong>
       </p>
 
       {disabledCount > 0 && (
@@ -87,12 +90,15 @@ export default function WorkflowDiagram({ onPickSkill }) {
             lineHeight: 1.5,
           }}
         >
-          <span style={{ fontWeight: 800 }}>✕</span>
+          {/* The left column is one glyph wide by design, so the label belongs in
+              the text column as a heading — putting it beside the ✕ collapses it
+              into a three-line stack at any width the intro actually gets. */}
+          <span style={{ fontWeight: 800, flexShrink: 0 }}>✕</span>
           <span>
-            <strong>{disabledCount} skills marked ✕ aren't switched on in this free demo.</strong>{" "}
-            The agents will still explain what each one does and when you'd reach for
-            it — they just won't produce the deliverable. Everything else works
-            normally.
+            <strong style={{ display: "block" }}>Disabled skills</strong>
+            Skills marked with an ✕ are switched off in this free demo. The agents
+            will still explain what each one does and when you'd reach for it, they
+            just won't produce the deliverable. Everything else works normally.
           </span>
         </div>
       )}

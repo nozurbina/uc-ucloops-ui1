@@ -18,15 +18,15 @@ const MAX_HISTORY_MESSAGES = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Skills like /initialize are meant to actually run — see the "init" request
-// flag below, which fires a real /initialize as the first turn so the template's
-// context primes the model. This addendum exists because the model would
-// otherwise sometimes echo the bare token "/initialize" instead of producing
-// that skill's defined output.
+// Skills like /start are meant to actually run — see the "init" request flag
+// below, which fires a real /start as the first turn so the template's context
+// primes the model. This addendum exists because the model would otherwise
+// sometimes echo the bare token "/start" instead of producing that skill's
+// defined output.
 const CHAT_MODE_ADDENDUM = `
 
 ---
-Skills such as /initialize and /help can be triggered either by the user typing that exact command, or by the app itself invoking it internally — for example, the very first turn of a brand-new conversation is always an internal /initialize call. Either way, when a skill is triggered, produce that skill's actual defined output directly. Never respond with just the bare command name/token (e.g. the literal text "/initialize") — that name is an internal trigger label, not something to say to the user.`;
+Skills such as /start and /help can be triggered either by the user typing that exact command, or by the app itself invoking it internally — for example, the very first turn of a brand-new conversation is always an internal /start call. Either way, when a skill is triggered, produce that skill's actual defined output directly. Never respond with just the bare command name/token (e.g. the literal text "/start") — that name is an internal trigger label, not something to say to the user.`;
 
 // The templates mark some skills "(DISABLED IN FREE DEMO)". The UX and Data
 // templates already carry a note about that; personas don't, and in all cases
@@ -105,14 +105,14 @@ When a skill needs something you don't have, ask — but assume the user is seei
 - Two or three lines. Don't interrogate.`;
 }
 
-// Only applied to the internal /initialize call. The persona template chains
-// /initialize straight into /help's full skill listing, which reads as an
-// unprompted info-dump — the UI has its own skills panel, so stop after the
-// greeting and let the user actually ask.
+// Only applied to the internal /start call. The persona template chains /start
+// straight into /help's full skill listing, which reads as an unprompted
+// info-dump — the UI has its own skills panel, so stop after the greeting and
+// let the user actually ask.
 const INIT_ADDENDUM = `
 
 ---
-For this specific /initialize call: stop after your greeting and short "About me" / introduction. Do NOT automatically continue into /help or list your skills menu — the interface already shows the skill list separately. End with one short line noting that /help is available if they want it, then stop and wait for the user's next message.`;
+For this specific /start call: stop after your greeting and short "About me" / introduction. Do NOT automatically continue into /help or list your skills menu — the interface already shows the skill list separately. End with one short line noting that /help is available if they want it, then stop and wait for the user's next message.`;
 
 // Turns a stored attachment reference into the right content block. The block
 // type has to match the file's media type — a PDF must be a `document`, a PNG
@@ -246,7 +246,7 @@ export default async function handler(req, res) {
     const textBlock = response.content.find((b) => b.type === "text");
     const reply = textBlock ? textBlock.text : "";
 
-    // The /initialize priming turn is app-triggered context-setting, not a real
+    // The /start priming turn is app-triggered context-setting, not a real
     // exchange, so it doesn't consume the user's budget.
     const newTurns = init ? turns : turns + 1;
     const newToken = encodeToken(newTurns, agent.id);

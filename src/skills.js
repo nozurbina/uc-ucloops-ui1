@@ -55,10 +55,10 @@ const SHARED_SKILLS_CATALOGUE = [
 
 const PERSONA_SKILLS = [
   {
-    command: "/initialize",
+    command: "/start",
     group: "Getting started",
     description: "Have me introduce myself and explain what I can help with",
-    example: "/initialize",
+    example: "/start",
   },
   {
     command: "/j-stage",

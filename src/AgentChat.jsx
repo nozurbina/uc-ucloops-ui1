@@ -398,11 +398,71 @@ export default function AgentChat() {
     return skills.filter((s) => s.command.toLowerCase().startsWith("/" + q)).slice(0, 8);
   }, [skillQuery, skills]);
 
+  // Transcript scroll state. `overflowing` and `atBottom` drive the "more below"
+  // affordance; `atBottom` also decides whether new content gets followed.
+  const [transcript, setTranscript] = useState({ overflowing: false, atBottom: true });
+
+  // A greeting is the agent talking about itself, not an exchange. Until the user
+  // has actually said something the transcript stays pinned to the top: the intro
+  // runs well past a phone viewport, so jumping to the bottom drops the reader
+  // mid-sentence with the opening line already scrolled off.
+  const userHasSpoken = useMemo(
+    () => convo.messages.some((m) => m.role === "user" && !m.hidden),
+    [convo.messages],
+  );
+
+  const measureTranscript = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setTranscript({
+      overflowing: el.scrollHeight > el.clientHeight + 2,
+      // Deliberately loose — "keeping up with the conversation" shouldn't mean
+      // being pixel-exact at the end, and momentum scrolling rarely lands there.
+      atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 24,
+    });
+  };
+
+  const scrollTranscriptToBottom = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+
+  // Sending is an explicit act, so it always wins over the rules below: you
+  // expect to see the message you just sent. Without this, sending from the
+  // pinned-top greeting would look like nothing happened, because the reader
+  // isn't at the bottom at that moment.
+  const lastMessage = convo.messages[convo.messages.length - 1];
+  const justSent = lastMessage?.role === "user" && !lastMessage.hidden;
+
+  // Otherwise two regimes: pinned to the top while the agent is only introducing
+  // itself, and following new content once a conversation is underway — the
+  // latter only if the reader was already at the bottom, so scrolling back to
+  // re-read an earlier answer isn't yanked away by the next reply arriving.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [convo.messages.length, activeId, sending, convo.initializing]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (justSent || (userHasSpoken && transcript.atBottom)) el.scrollTop = el.scrollHeight;
+    else if (!userHasSpoken) el.scrollTop = 0;
+    measureTranscript();
+    // `transcript.atBottom` is read but is deliberately not a dependency: it has
+    // to describe where the reader was *before* this render added content, and
+    // re-running on every scroll would fight them for control of scrollTop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convo.messages.length, activeId, sending, convo.initializing, userHasSpoken, justSent]);
+
+  // Content height changes with no scroll or window resize of its own: markdown
+  // reflows as web fonts settle, and switching agents swaps the whole transcript.
+  // Observing the children as well as the container catches both, so the
+  // affordance doesn't depend on the user scrolling to discover it. Children are
+  // re-observed whenever the transcript changes.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measureTranscript);
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    return () => ro.disconnect();
+  }, [activeId, convo.messages.length, convo.initializing]);
 
   // Ask the server whether a password is required and whether this browser has
   // already satisfied it (the gate cookie is httpOnly, so only the server knows).
@@ -425,7 +485,7 @@ export default function AgentChat() {
     };
   }, []);
 
-  // Real /initialize priming turn — runs once per agent, before any user
+  // Real /start priming turn — runs once per agent, before any user
   // message, so the greeting is genuinely model-generated from the agent's own
   // template rather than a static placeholder. Hidden from the visible
   // transcript, but part of the history sent to the API on later turns.
@@ -441,12 +501,11 @@ export default function AgentChat() {
     if (convo.initialized || convo.initializing || initStarted.current.has(activeId)) return;
     initStarted.current.add(activeId);
     runInitialize(activeId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked, demoCap, landing]);
 
   async function runInitialize(agentId) {
     setConvos((prev) => ({ ...prev, [agentId]: { ...prev[agentId], initializing: true } }));
-    const initMsg = { role: "user", content: "/initialize", hidden: true };
+    const initMsg = { role: "user", content: "/start", hidden: true };
 
     try {
       const res = await fetch("/api/chat", {
@@ -615,7 +674,9 @@ export default function AgentChat() {
     }
   }
 
-  function useStarter(starter) {
+  // Not a hook, despite the old name — the `use` prefix is reserved for hooks and
+  // made rules-of-hooks flag every call site as a violation.
+  function applyStarter(starter) {
     if (starter.action === "overview") {
       // Interface action, not a message. The conversation stays exactly where it
       // is — the sidebar card comes back to it.
@@ -1500,188 +1561,236 @@ export default function AgentChat() {
             </div>
           )}
 
-          {/* Transcript */}
-          <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
-            {convo.initializing && (
-              <div
-                style={{
-                  maxWidth: 520,
-                  margin: "2rem auto",
-                  textAlign: "center",
-                  color: "var(--text-muted)",
-                  fontSize: ".92rem",
-                }}
-              >
+          {/* Transcript. The wrapper exists to give the "more below" affordance a
+              positioned ancestor that does NOT scroll — anchoring it to the scroll
+              container would put the pill at the bottom of the *content* rather
+              than the bottom of the visible area. */}
+          <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
+            <div
+              ref={scrollRef}
+              onScroll={measureTranscript}
+              style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}
+            >
+              {convo.initializing && (
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    marginBottom: "1rem",
+                    maxWidth: 520,
+                    margin: "2rem auto",
+                    textAlign: "center",
+                    color: "var(--text-muted)",
+                    fontSize: ".92rem",
                   }}
                 >
-                  <AgentAvatar agent={active} size={72} ring={false} />
-                </div>
-                Getting {active.name} ready…
-              </div>
-            )}
-
-            <div
-              style={{
-                maxWidth: 720,
-                margin: "0 auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-              }}
-            >
-              {convo.messages
-                .filter((m) => !m.hidden)
-                .map((m, i) => (
                   <div
-                    key={i}
                     style={{
                       display: "flex",
-                      justifyContent: m.role === "user" ? "flex-end" : "flex-start",
-                      gap: ".6rem",
+                      justifyContent: "center",
+                      marginBottom: "1rem",
                     }}
                   >
-                    {m.role === "assistant" && (
-                      <AgentAvatar agent={active} size={30} ring={false} />
-                    )}
+                    <AgentAvatar agent={active} size={72} ring={false} />
+                  </div>
+                  Getting {active.name} ready…
+                </div>
+              )}
+
+              <div
+                style={{
+                  maxWidth: 720,
+                  margin: "0 auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1rem",
+                }}
+              >
+                {convo.messages
+                  .filter((m) => !m.hidden)
+                  .map((m, i) => (
                     <div
-                      className={m.role === "user" ? "bubble-user" : "bubble-assistant"}
+                      key={i}
                       style={{
-                        maxWidth: "75%",
-                        padding: ".7rem 1rem",
-                        borderRadius: 14,
-                        background: m.role === "user" ? "var(--purple-deep)" : "var(--bg-card)",
-                        color: m.role === "user" ? "#fff" : "var(--text)",
-                        border: m.role === "user" ? "none" : "1px solid var(--border)",
-                        fontSize: ".92rem",
-                        lineHeight: 1.55,
-                        boxShadow: m.role === "user" ? "none" : "0 1px 3px rgba(0,0,0,.05)",
+                        display: "flex",
+                        justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                        gap: ".6rem",
                       }}
                     >
-                      {!!m.attachments?.length && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: ".35rem",
-                            marginBottom: m.content ? ".5rem" : 0,
-                          }}
-                        >
-                          {m.attachments.map((a) => (
-                            <span
-                              key={a.fileId}
-                              style={{
-                                fontSize: ".72rem",
-                                background: "rgba(255,255,255,.16)",
-                                borderRadius: 6,
-                                padding: ".2rem .45rem",
-                              }}
-                            >
-                              📎 {a.filename}
-                            </span>
-                          ))}
-                        </div>
+                      {m.role === "assistant" && (
+                        <AgentAvatar agent={active} size={30} ring={false} />
                       )}
-                      {m.content && (
-                        <div className="md-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-              {sending && (
-                <div style={{ display: "flex", gap: ".6rem" }}>
-                  <AgentAvatar agent={active} size={30} ring={false} />
-                  <div
-                    style={{
-                      padding: ".7rem 1rem",
-                      borderRadius: 14,
-                      background: "var(--bg-card)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text-muted)",
-                      fontSize: ".85rem",
-                    }}
-                  >
-                    {active.name} is typing…
-                  </div>
-                </div>
-              )}
-
-              {showStarters && (
-                <div style={{ marginTop: ".25rem", paddingLeft: "2.1rem" }}>
-                  <div
-                    style={{
-                      fontSize: ".66rem",
-                      fontWeight: 700,
-                      letterSpacing: ".12em",
-                      textTransform: "uppercase",
-                      color: "var(--text-muted)",
-                      marginBottom: ".55rem",
-                    }}
-                  >
-                    Try one of these
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
-                    {startersForAgent(activeId, convo.starterSeed).map((s) => (
-                      <button
-                        key={s.label}
-                        onClick={() => useStarter(s)}
+                      <div
+                        className={m.role === "user" ? "bubble-user" : "bubble-assistant"}
                         style={{
-                          textAlign: "left",
-                          // Action cards are tinted to match the panel they
-                          // open, so it's not a surprise when clicking one
-                          // reveals a panel instead of sending a message.
-                          background: s.action ? "#fdf8ee" : "var(--bg-card)",
-                          border: s.action ? "1px solid #f0d999" : "1px solid var(--border)",
-                          borderLeft: s.action
-                            ? "3px solid var(--amber)"
-                            : "3px solid var(--gold)",
-                          borderRadius: 10,
-                          padding: ".55rem .8rem",
-                          cursor: "pointer",
-                          maxWidth: 330,
-                          boxShadow: "0 1px 3px rgba(0,0,0,.04)",
-                          fontFamily: "inherit",
+                          maxWidth: "75%",
+                          padding: ".7rem 1rem",
+                          borderRadius: 14,
+                          background: m.role === "user" ? "var(--purple-deep)" : "var(--bg-card)",
+                          color: m.role === "user" ? "#fff" : "var(--text)",
+                          border: m.role === "user" ? "none" : "1px solid var(--border)",
+                          fontSize: ".92rem",
+                          lineHeight: 1.55,
+                          boxShadow: m.role === "user" ? "none" : "0 1px 3px rgba(0,0,0,.05)",
                         }}
                       >
-                        <div
+                        {!!m.attachments?.length && (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: ".35rem",
+                              marginBottom: m.content ? ".5rem" : 0,
+                            }}
+                          >
+                            {m.attachments.map((a) => (
+                              <span
+                                key={a.fileId}
+                                style={{
+                                  fontSize: ".72rem",
+                                  background: "rgba(255,255,255,.16)",
+                                  borderRadius: 6,
+                                  padding: ".2rem .45rem",
+                                }}
+                              >
+                                📎 {a.filename}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {m.content && (
+                          <div className="md-content">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                {sending && (
+                  <div style={{ display: "flex", gap: ".6rem" }}>
+                    <AgentAvatar agent={active} size={30} ring={false} />
+                    <div
+                      style={{
+                        padding: ".7rem 1rem",
+                        borderRadius: 14,
+                        background: "var(--bg-card)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-muted)",
+                        fontSize: ".85rem",
+                      }}
+                    >
+                      {active.name} is typing…
+                    </div>
+                  </div>
+                )}
+
+                {showStarters && (
+                  <div style={{ marginTop: ".25rem", paddingLeft: "2.1rem" }}>
+                    <div
+                      style={{
+                        fontSize: ".66rem",
+                        fontWeight: 700,
+                        letterSpacing: ".12em",
+                        textTransform: "uppercase",
+                        color: "var(--text-muted)",
+                        marginBottom: ".55rem",
+                      }}
+                    >
+                      Try one of these
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
+                      {startersForAgent(activeId, convo.starterSeed).map((s) => (
+                        <button
+                          key={s.label}
+                          onClick={() => applyStarter(s)}
                           style={{
-                            fontSize: ".84rem",
-                            fontWeight: 600,
-                            color: s.action ? "#7a5c0a" : "var(--slate)",
-                            marginBottom: ".12rem",
+                            textAlign: "left",
+                            // Action cards are tinted to match the panel they
+                            // open, so it's not a surprise when clicking one
+                            // reveals a panel instead of sending a message.
+                            background: s.action ? "#fdf8ee" : "var(--bg-card)",
+                            border: s.action ? "1px solid #f0d999" : "1px solid var(--border)",
+                            borderLeft: s.action
+                              ? "3px solid var(--amber)"
+                              : "3px solid var(--gold)",
+                            borderRadius: 10,
+                            padding: ".55rem .8rem",
+                            cursor: "pointer",
+                            maxWidth: 330,
+                            boxShadow: "0 1px 3px rgba(0,0,0,.04)",
+                            fontFamily: "inherit",
                           }}
                         >
-                          {s.action === "sources" && "🎙️ "}
-                          {s.label}
-                          {s.fill && (
-                            <span
-                              style={{
-                                marginLeft: ".35rem",
-                                fontWeight: 500,
-                                fontSize: ".7rem",
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              →
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: ".74rem", color: "var(--text-muted)" }}>
-                          {s.hint}
-                        </div>
-                      </button>
-                    ))}
+                          <div
+                            style={{
+                              fontSize: ".84rem",
+                              fontWeight: 600,
+                              color: s.action ? "#7a5c0a" : "var(--slate)",
+                              marginBottom: ".12rem",
+                            }}
+                          >
+                            {s.action === "sources" && "🎙️ "}
+                            {s.label}
+                            {s.fill && (
+                              <span
+                                style={{
+                                  marginLeft: ".35rem",
+                                  fontWeight: 500,
+                                  fontSize: ".7rem",
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                →
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: ".74rem", color: "var(--text-muted)" }}>
+                            {s.hint}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+
+            {transcript.overflowing && !transcript.atBottom && (
+              <>
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 56,
+                    pointerEvents: "none",
+                    background: "linear-gradient(to bottom, transparent, var(--bg))",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={scrollTranscriptToBottom}
+                  style={{
+                    position: "absolute",
+                    bottom: 10,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "var(--slate)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 999,
+                    padding: ".26rem .7rem",
+                    fontSize: ".68rem",
+                    fontWeight: 700,
+                    letterSpacing: ".04em",
+                    opacity: 0.9,
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                  }}
+                >
+                  scroll down for more ↓
+                </button>
+              </>
+            )}
           </div>
 
           {/* Composer */}

@@ -31,7 +31,7 @@ export const WORKFLOW_LOOPS = [
     agent: "Persona Simulations",
     agentId: "omar",
     what: "Each persona becomes something you can talk to. It answers in first person from its own research, and will push back rather than agree with you.",
-    skills: ["/initialize", "/ideate"],
+    skills: ["/start", "/ideate"],
     produces: "A persona you can interview, challenge, and test ideas against",
   },
   {
