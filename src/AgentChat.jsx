@@ -7,12 +7,13 @@ import {
   ASSISTANT_META,
   getAgentMeta,
   sourceWordTotal,
+  EVIDENCE_MAP_URL,
 } from "./agentMeta.js";
 import { skillsForAgent, groupedSkillsForAgent, WORKFLOW_CHAIN } from "./skills.js";
 import { startersForAgent } from "./starters.js";
+import { COURSES_URL, TRAINING_EMAIL } from "./links.js";
 import WorkflowDiagram from "./WorkflowDiagram.jsx";
 
-const EVIDENCE_MAP_URL = "https://urbinaconsulting.com/shares/ucloops/borderblend/";
 const MAX_FILES = 3;
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -341,8 +342,8 @@ function PasswordGate({ onUnlock }) {
         </button>
         <p style={{ fontSize: ".76rem", color: "var(--text-muted)", margin: "1rem 0 0", textAlign: "center" }}>
           Need access? Contact{" "}
-          <a href="mailto:ucloops@urbinaconsulting.com" style={{ color: "var(--purple)" }}>
-            ucloops@urbinaconsulting.com
+          <a href={`mailto:${TRAINING_EMAIL}`} style={{ color: "var(--purple)" }}>
+            {TRAINING_EMAIL}
           </a>
         </p>
       </form>
@@ -411,15 +412,36 @@ export default function AgentChat() {
     [convo.messages],
   );
 
+  // Whether the transcript should stay stuck to the end as content grows. A ref,
+  // not state, because the ResizeObserver needs the current value without being
+  // re-subscribed on every change.
+  const followRef = useRef(false);
+
   const measureTranscript = () => {
     const el = scrollRef.current;
+    if (!el) return false;
+    // Deliberately loose — "keeping up with the conversation" shouldn't mean being
+    // pixel-exact at the end, and momentum scrolling rarely lands there.
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    setTranscript({ overflowing: el.scrollHeight > el.clientHeight + 2, atBottom });
+    return atBottom;
+  };
+
+  const lastScrollTopRef = useRef(0);
+
+  // Only *direction* is a reliable signal of intent. Growing content fires scroll
+  // events too, and at that instant we're no longer at the bottom — so keying off
+  // "am I at the bottom" alone made the transcript stop following a conversation
+  // the reader had never scrolled away from. Growth leaves scrollTop untouched, so:
+  // moving up means they want to read back, and arriving at the end means they've
+  // caught up again.
+  const handleTranscriptScroll = () => {
+    const el = scrollRef.current;
     if (!el) return;
-    setTranscript({
-      overflowing: el.scrollHeight > el.clientHeight + 2,
-      // Deliberately loose — "keeping up with the conversation" shouldn't mean
-      // being pixel-exact at the end, and momentum scrolling rarely lands there.
-      atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 24,
-    });
+    const atBottom = measureTranscript();
+    if (el.scrollTop < lastScrollTopRef.current - 2) followRef.current = false;
+    else if (atBottom) followRef.current = true;
+    lastScrollTopRef.current = el.scrollTop;
   };
 
   const scrollTranscriptToBottom = () => {
@@ -435,34 +457,55 @@ export default function AgentChat() {
   const justSent = lastMessage?.role === "user" && !lastMessage.hidden;
 
   // Otherwise two regimes: pinned to the top while the agent is only introducing
-  // itself, and following new content once a conversation is underway — the
-  // latter only if the reader was already at the bottom, so scrolling back to
-  // re-read an earlier answer isn't yanked away by the next reply arriving.
+  // itself, and following new content once a conversation is underway — the latter
+  // only if the reader hasn't scrolled away, so going back to re-read an earlier
+  // answer isn't yanked away by the next reply arriving.
+  //
+  // The decision reads followRef, not the measured atBottom. Measured position goes
+  // stale the moment content grows underneath us: the "is typing" indicator is
+  // ~125px, so by the time the reply arrived we no longer looked "at the bottom"
+  // and stopped following a conversation the reader never left. followRef only
+  // changes on an actual scroll event, which is the real signal of intent.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (justSent || (userHasSpoken && transcript.atBottom)) el.scrollTop = el.scrollHeight;
-    else if (!userHasSpoken) el.scrollTop = 0;
+    if (justSent || (userHasSpoken && followRef.current)) {
+      el.scrollTop = el.scrollHeight;
+      followRef.current = true;
+    } else if (!userHasSpoken) {
+      el.scrollTop = 0;
+      followRef.current = false;
+    }
+    lastScrollTopRef.current = el.scrollTop;
     measureTranscript();
-    // `transcript.atBottom` is read but is deliberately not a dependency: it has
-    // to describe where the reader was *before* this render added content, and
-    // re-running on every scroll would fight them for control of scrollTop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convo.messages.length, activeId, sending, convo.initializing, userHasSpoken, justSent]);
 
   // Content height changes with no scroll or window resize of its own: markdown
   // reflows as web fonts settle, and switching agents swaps the whole transcript.
-  // Observing the children as well as the container catches both, so the
-  // affordance doesn't depend on the user scrolling to discover it. Children are
-  // re-observed whenever the transcript changes.
+  // Observing the children as well as the container catches both, so the affordance
+  // doesn't depend on the user scrolling to discover it.
+  //
+  // It also has to re-pin. Growth that lands *after* the scroll effect has run
+  // would otherwise leave the transcript short of the end — on a slow load that was
+  // reproducibly ~125px, which reads as "the reply arrived but I can't see it".
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measureTranscript);
+    const ro = new ResizeObserver(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+      if (followRef.current) {
+        node.scrollTop = node.scrollHeight;
+        lastScrollTopRef.current = node.scrollTop;
+      }
+      measureTranscript();
+    });
     ro.observe(el);
     for (const child of el.children) ro.observe(child);
     return () => ro.disconnect();
-  }, [activeId, convo.messages.length, convo.initializing]);
+    // `sending` is in here because it adds the "is typing" row: without it that
+    // child is never observed and its height change goes unnoticed.
+  }, [activeId, convo.messages.length, convo.initializing, sending]);
 
   // Ask the server whether a password is required and whether this browser has
   // already satisfied it (the gate cookie is httpOnly, so only the server knows).
@@ -601,7 +644,9 @@ export default function AgentChat() {
   // `overrideText` lets a conversation starter send directly without first
   // round-tripping through the composer's state.
   async function send(overrideText) {
-    const text = (overrideText ?? draft).trim();
+    // Only honour a real string. Wiring this straight to onClick hands us a
+    // MouseEvent, which used to throw on .trim() and silently break the button.
+    const text = (typeof overrideText === "string" ? overrideText : draft).trim();
     if (
       (!text && !attachments.length) ||
       sending ||
@@ -1116,6 +1161,59 @@ export default function AgentChat() {
               </div>
             </div>
           ))}
+
+          {/* Courses card — the sidebar counterpart of the promo banner on the
+              BorderBlend deliverables site. Same copy, same destination, same
+              purple-and-gold treatment, restated for a ~250px column: the logo
+              sits above the copy rather than beside it, since side-by-side would
+              leave the text about twelve characters wide. */}
+          <div style={{ padding: "1rem .75rem 0" }}>
+            <div
+              style={{
+                background: "var(--purple-deep)",
+                border: "1px solid rgba(255,255,255,.16)",
+                borderRadius: 10,
+                padding: ".8rem .75rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: ".55rem",
+              }}
+            >
+              <img
+                src="/uc-logo.svg"
+                alt="Urbina Consulting"
+                style={{ height: 22, width: "auto", alignSelf: "flex-start" }}
+              />
+              <div style={{ fontSize: ".76rem", lineHeight: 1.4, color: "rgba(255,255,255,.9)" }}>
+                This is a generated example built with Urbina&rsquo;s ucLoops AI
+                methodology. It&rsquo;s even better used with{" "}
+                <strong style={{ color: "var(--gold-bright)" }}>real research sources.</strong>{" "}
+                Learn how to use it yourself on our cohort or private courses.
+              </div>
+              <a
+                href={COURSES_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  alignSelf: "flex-start",
+                  background: "linear-gradient(180deg, var(--gold-bright), var(--gold))",
+                  color: "var(--slate)",
+                  padding: ".38rem 1rem",
+                  borderRadius: 999,
+                  fontSize: ".78rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Learn more
+              </a>
+            </div>
+          </div>
+
           <div style={{ height: ".75rem" }} />
         </aside>
 
@@ -1185,7 +1283,10 @@ export default function AgentChat() {
             }}
           >
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: isNarrow ? "1rem" : "1.1rem", fontWeight: 700 }}>
+              <div
+                data-testid="active-agent"
+                style={{ fontSize: isNarrow ? "1rem" : "1.1rem", fontWeight: 700 }}
+              >
                 {active.name}
               </div>
               <div
@@ -1568,7 +1669,8 @@ export default function AgentChat() {
           <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
             <div
               ref={scrollRef}
-              onScroll={measureTranscript}
+              onScroll={handleTranscriptScroll}
+              data-testid="transcript"
               style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}
             >
               {convo.initializing && (
@@ -1769,6 +1871,7 @@ export default function AgentChat() {
                 <button
                   type="button"
                   onClick={scrollTranscriptToBottom}
+                  data-testid="scroll-for-more"
                   style={{
                     position: "absolute",
                     bottom: 10,
@@ -1940,7 +2043,7 @@ export default function AgentChat() {
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
                     <a
-                      href="mailto:ucloops@urbinaconsulting.com?subject=Unlocked%20ucLoops%20demo%20access"
+                      href={`mailto:${TRAINING_EMAIL}?subject=Unlocked%20ucLoops%20demo%20access`}
                       style={{
                         background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
                         color: "var(--purple-deep)",
@@ -2119,7 +2222,9 @@ export default function AgentChat() {
                       }}
                     />
                     <button
-                      onClick={send}
+                      // Not `onClick={send}`: React would pass the click event as
+                      // `overrideText`, and send() calls .trim() on it.
+                      onClick={() => send()}
                       disabled={inputDisabled || (!draft.trim() && !attachments.length)}
                       style={{
                         background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",

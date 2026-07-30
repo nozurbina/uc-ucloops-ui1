@@ -50,4 +50,16 @@ export default [
       globals: globals.node,
     },
   },
+
+  // Playwright specs run in Node, but the callbacks passed to page.evaluate() are
+  // serialised and executed in the browser — so both global sets are legitimate
+  // in the same file.
+  {
+    files: ["tests/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 ];

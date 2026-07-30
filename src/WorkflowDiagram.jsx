@@ -1,5 +1,6 @@
 import { WORKFLOW_LOOPS, CROSS_CUTTING, LOOP_BACK_NOTE } from "./workflow.js";
 import { isDisabled } from "./skills.js";
+import { COURSES_URL, TRAINING_EMAIL } from "./links.js";
 
 const AGENT_COLOUR = {
   data: "#0b6a5b",
@@ -251,6 +252,76 @@ export default function WorkflowDiagram({ onPickSkill }) {
               {s.note}
             </span>
           ))}
+        </div>
+      </div>
+
+      {/* Training CTA, last thing in the diagram. It lands after someone has read
+          what the method actually does, which is the point at which "could I do
+          this myself?" becomes a live question. The "Ready to try it?" card that
+          AgentChat renders below this still comes after, deliberately: the last
+          word on the screen should be an invitation to stay, not to leave. */}
+      <div
+        style={{
+          marginTop: "1.6rem",
+          background: "var(--purple-deep)",
+          borderRadius: 12,
+          padding: "1.1rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "1rem",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "#fff", fontSize: ".95rem", fontWeight: 700, lineHeight: 1.35 }}>
+            Want to learn to create personas like these in your own tools?
+          </div>
+          <div
+            style={{
+              color: "rgba(255,255,255,.78)",
+              fontSize: ".8rem",
+              lineHeight: 1.45,
+              marginTop: ".25rem",
+            }}
+          >
+            ucLoops runs in the AI tools you already use. We teach it on cohort and
+            private courses.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: ".7rem", flexWrap: "wrap" }}>
+          <a
+            href={COURSES_URL}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "linear-gradient(180deg, var(--gold-bright), var(--gold))",
+              color: "var(--slate)",
+              padding: ".5rem 1.4rem",
+              borderRadius: 999,
+              fontSize: ".85rem",
+              fontWeight: 700,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Contact us for training
+          </a>
+          <a
+            href={`mailto:${TRAINING_EMAIL}`}
+            style={{
+              color: "var(--gold-bright)",
+              fontSize: ".78rem",
+              fontWeight: 600,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {TRAINING_EMAIL}
+          </a>
         </div>
       </div>
     </div>
