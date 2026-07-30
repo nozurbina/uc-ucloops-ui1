@@ -803,8 +803,10 @@ export default function AgentChat() {
           }}
         >
           <span>←</span>
-          {/* The full label is the first thing to overflow on a phone. */}
-          <span>{isNarrow ? "Evidence Map" : "Back to BorderBlend Evidence Map"}</span>
+          {/* Same label the site's own sticky bar uses, at every width — the
+              viewer's toolbar prefixes its own "Back to", and the long version
+              wrapped on a phone. */}
+          <span>Evidence Map</span>
         </a>
         {isNarrow && <span style={{ flex: 1 }} />}
         {/* Both of these are scoped to whoever you're talking to, so they'd be
