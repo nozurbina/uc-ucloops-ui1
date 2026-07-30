@@ -1,6 +1,7 @@
 import { WORKFLOW_LOOPS, CROSS_CUTTING, LOOP_BACK_NOTE } from "./workflow.js";
 import { isDisabled } from "./skills.js";
-import { COURSES_URL, TRAINING_EMAIL } from "./links.js";
+import { COURSES_URL } from "./links.js";
+import ContactEmail from "./ContactEmail.jsx";
 
 const AGENT_COLOUR = {
   data: "#0b6a5b",
@@ -310,18 +311,17 @@ export default function WorkflowDiagram({ onPickSkill }) {
           >
             Contact us for training
           </a>
-          <a
-            href={`mailto:${TRAINING_EMAIL}`}
+          <ContactEmail
+            subject="ucLoops training"
             style={{
               color: "var(--gold-bright)",
               fontSize: ".78rem",
               fontWeight: 600,
               textDecoration: "none",
               whiteSpace: "nowrap",
+              cursor: "pointer",
             }}
-          >
-            {TRAINING_EMAIL}
-          </a>
+          />
         </div>
       </div>
     </div>

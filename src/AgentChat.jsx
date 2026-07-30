@@ -11,7 +11,8 @@ import {
 } from "./agentMeta.js";
 import { skillsForAgent, groupedSkillsForAgent, WORKFLOW_CHAIN } from "./skills.js";
 import { startersForAgent } from "./starters.js";
-import { COURSES_URL, TRAINING_EMAIL } from "./links.js";
+import { COURSES_URL } from "./links.js";
+import ContactEmail from "./ContactEmail.jsx";
 import WorkflowDiagram from "./WorkflowDiagram.jsx";
 
 const MAX_FILES = 3;
@@ -342,9 +343,10 @@ function PasswordGate({ onUnlock }) {
         </button>
         <p style={{ fontSize: ".76rem", color: "var(--text-muted)", margin: "1rem 0 0", textAlign: "center" }}>
           Need access? Contact{" "}
-          <a href={`mailto:${TRAINING_EMAIL}`} style={{ color: "var(--purple)" }}>
-            {TRAINING_EMAIL}
-          </a>
+          <ContactEmail
+            subject="ucLoops demo access"
+            style={{ color: "var(--purple)", cursor: "pointer" }}
+          />
         </p>
       </form>
       <style>{`
@@ -2042,8 +2044,8 @@ export default function AgentChat() {
                     {!demoCap.personalCap && " Or come back tomorrow when the allowance resets."}
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
-                    <a
-                      href={`mailto:${TRAINING_EMAIL}?subject=Unlocked%20ucLoops%20demo%20access`}
+                    <ContactEmail
+                      subject="Unlocked ucLoops demo access"
                       style={{
                         background: "linear-gradient(180deg,var(--gold-bright),var(--gold))",
                         color: "var(--purple-deep)",
@@ -2052,10 +2054,11 @@ export default function AgentChat() {
                         fontWeight: 700,
                         fontSize: ".85rem",
                         textDecoration: "none",
+                        cursor: "pointer",
                       }}
                     >
                       Request full access
-                    </a>
+                    </ContactEmail>
                     <a
                       href="https://urbinaconsulting.com/ucloops"
                       target="_blank"
