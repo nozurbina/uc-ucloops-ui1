@@ -1,19 +1,27 @@
 import { useState } from "react";
 import { rememberAcknowledgement } from "./acknowledgement.js";
+import { TRAINING_EMAIL } from "./links.js";
 
 // Consent screen shown once per browser before any content can leave the page.
 //
-// The copy is deliberately narrower than the usual boilerplate, because two of the
-// common claims are not true of this app and would be misleading:
+// The copy states what the code actually does, which is narrower than the usual
+// boilerplate in two places and broader in one:
 //
-//   "content is deleted after processing" — attachments go to the Anthropic Files
-//   API and stay there. Nothing in this codebase deletes them.
+//   NOT "a sampling of content is sent to a third-party AI provider" — all of it
+//   is. That is how the app works at all.
 //
-//   "a sampling of content is sent to a third-party AI provider" — all of it is.
-//   That is how the app works at all.
+//   NOT "deleted immediately after processing" — submissions are kept for up to
+//   30 days so they can be reviewed (api/_reviewLog.js sets the TTL; the daily
+//   cron in api/cron/sweep.js deletes the Anthropic-side files).
 //
-// If file deletion is implemented later, the attachment sentence can be softened —
-// but not before.
+//   It DOES disclose that Urbina Consulting reads and analyses submissions to
+//   improve the product. That is the trade for the demo being free, so it is
+//   stated in bold rather than buried, and the private-demo alternative is
+//   offered in the same breath.
+//
+// If the retention window or the analysis purpose changes, this copy and the
+// ACK_STORAGE_KEY version both have to change — the key bump is what re-asks
+// everyone who already accepted the old terms.
 const THEME_FALLBACK = {
   "--purple-deep": "#500850",
   "--gold": "#d7a32b",
@@ -85,23 +93,30 @@ export default function AcknowledgementGate({ onAccept }) {
             provider, to generate responses — all of it, not a sample.
           </p>
           <p style={{ margin: "0 0 .7rem" }}>
-            Urbina Consulting does not store, share, or repurpose my conversations. They
-            exist only in this browser session and are gone when I close or reload the
-            page. Only anonymous usage counters are kept, to enforce this demo&rsquo;s
-            limits.
+            <strong>
+              Because this demo is free, Urbina Consulting keeps a copy of what I submit
+              &mdash; including any files I attach &mdash; and may read and analyse it to
+              improve our products and training.
+            </strong>{" "}
+            Copies are retained for <strong>up to 30 days</strong> and then deleted. They
+            are not sold, published, or shared outside Urbina Consulting.
           </p>
           <p style={{ margin: "0 0 .7rem" }}>
-            <strong>
-              Files I attach are uploaded to Anthropic&rsquo;s file storage and are not
-              deleted automatically, so I will not attach confidential material.
-            </strong>{" "}
-            The demo works without attachments.
+            <strong>So I will not submit anything confidential.</strong> I am responsible
+            for ensuring that anything I submit complies with my organisation&rsquo;s
+            policies and applicable laws. If I need a demo where submissions are not
+            retained or analysed,{" "}
+            <a
+              href={`mailto:${TRAINING_EMAIL}?subject=${encodeURIComponent("Private ucLoops demo (no retention)")}`}
+              style={{ color: "var(--purple-deep)", fontWeight: 700 }}
+            >
+              I can ask for a private one
+            </a>
+            .
           </p>
           <p style={{ margin: 0 }}>
-            I am responsible for ensuring that anything I submit complies with my
-            organisation&rsquo;s policies and applicable laws. Urbina Consulting assumes no
-            liability for any legal, compliance, or confidentiality issues arising from
-            content submitted to this demo.
+            Urbina Consulting assumes no liability for any legal, compliance, or
+            confidentiality issues arising from content submitted to this demo.
           </p>
         </div>
 

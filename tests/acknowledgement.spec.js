@@ -26,10 +26,26 @@ test("the notice states what is actually true of this app", async ({ page }) => 
   const notice = page.locator("form").filter({ hasText: "Before you start" });
   // All content goes to Anthropic, not a sample of it.
   await expect(notice).toContainText("all of it, not a sample");
-  // Attachments persist — nothing in the app deletes them.
-  await expect(notice).toContainText("not deleted automatically");
+  // The trade for the demo being free: submissions are kept and read.
+  await expect(notice).toContainText("keeps a copy of what I submit");
+  await expect(notice).toContainText("read and analyse it");
+  // The retention window the sweep and the Redis TTL actually implement.
+  await expect(notice).toContainText("up to 30 days");
   await expect(notice).toContainText("Anthropic");
   await expect(notice).toContainText("Urbina Consulting assumes no liability");
+});
+
+test("the notice offers a private demo for anyone who can't accept retention", async ({ page }) => {
+  await stubApi(page, { ack: false });
+  await page.goto("/");
+
+  // The alternative has to be reachable from the gate itself — someone who
+  // can't agree to retention needs a way out that isn't "give up".
+  const optOut = page.getByRole("link", { name: "I can ask for a private one" });
+  await expect(optOut).toHaveAttribute(
+    "href",
+    /^mailto:ucloops@urbinaconsulting\.com\?subject=/,
+  );
 });
 
 test("accepting is required, not just offered", async ({ page }) => {

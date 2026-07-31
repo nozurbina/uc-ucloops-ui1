@@ -24,14 +24,9 @@ export const SHORT_GREETING = "Hello, I'm Omar. Ask me about weekday lunch.";
 
 export const REPLY = "Six minutes, genuinely good brisket, and knowing the truck is there.";
 
-/**
- * Stubs every API route the app touches.
- *
- * `greeting` controls the priming turn, which is what the scroll behaviour keys
- * off — pass SHORT_GREETING to assert the affordance stays hidden when the
- * transcript fits.
- */
-export const ACK_STORAGE_KEY = "ucLoopsAckV1";
+// Must match src/acknowledgement.js — a mismatch sends every test through the
+// consent gate instead of the app.
+export const ACK_STORAGE_KEY = "ucLoopsAckV2";
 
 /**
  * Pre-accept the demo terms. Uses addInitScript so the key is in place before the
@@ -45,6 +40,13 @@ export async function acceptTerms(page) {
   );
 }
 
+/**
+ * Stubs every API route the app touches.
+ *
+ * `greeting` controls the priming turn, which is what the scroll behaviour keys
+ * off — pass SHORT_GREETING to assert the affordance stays hidden when the
+ * transcript fits. `ack` pre-accepts the consent gate.
+ */
 export async function stubApi(page, { greeting = LONG_GREETING, turnsMax = 15, ack = true } = {}) {
   // Most tests are about something behind the consent screen, so accept by default
   // and let the acknowledgement specs opt out.

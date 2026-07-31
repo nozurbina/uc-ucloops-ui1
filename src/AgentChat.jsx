@@ -193,7 +193,17 @@ function emptyConvo(maxTurns) {
     // conversation. Set once here so the cards stay put while you type, and
     // change only when a new conversation begins.
     starterSeed: Math.random(),
+    // Groups this conversation's turns into one reviewable record server-side.
+    // Not an identity: it's random per conversation, resets with "New
+    // conversation", and is never tied to a person or browser.
+    conversationId: newConversationId(),
   };
+}
+
+function newConversationId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function initialConvos() {
@@ -696,7 +706,12 @@ export default function AgentChat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: activeId, messages: historyForApi, token: convo.token }),
+        body: JSON.stringify({
+          agentId: activeId,
+          messages: historyForApi,
+          token: convo.token,
+          conversationId: convo.conversationId,
+        }),
       });
       const data = await res.json();
       // Gate cookie expired or was cleared mid-session — send them back to the

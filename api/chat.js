@@ -10,6 +10,7 @@ import {
   checkAndCountDaily,
   requireUnlocked,
 } from "./_limits.js";
+import { recordTurn } from "./_reviewLog.js";
 import { MAX_FILES } from "./upload.js";
 
 const MODEL = "claude-haiku-4-5";
@@ -166,7 +167,7 @@ export default async function handler(req, res) {
   if (!requireUnlocked(req, res)) return;
 
   try {
-    const { agentId, messages, token, init } = req.body ?? {};
+    const { agentId, messages, token, init, conversationId } = req.body ?? {};
 
     const agent = getAgent(agentId);
     if (!agent) {
@@ -245,6 +246,21 @@ export default async function handler(req, res) {
 
     const textBlock = response.content.find((b) => b.type === "text");
     const reply = textBlock ? textBlock.text : "";
+
+    // Retained for review — see api/_reviewLog.js and the acknowledgement gate.
+    // Skipped for the priming turn: `/start` is app-triggered, so a visitor who
+    // opens a persona and leaves without typing has submitted nothing and gets no
+    // record. The first real message is what creates one.
+    if (!init) {
+      const lastUser = [...messages].reverse().find((m) => m.role === "user" && !m.hidden);
+      await recordTurn({
+        conversationId,
+        agentId: agent.id,
+        userText: lastUser?.content,
+        assistantText: reply,
+        attachments: lastUser?.attachments ?? [],
+      });
+    }
 
     // The /start priming turn is app-triggered context-setting, not a real
     // exchange, so it doesn't consume the user's budget.

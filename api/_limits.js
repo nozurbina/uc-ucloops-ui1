@@ -220,6 +220,20 @@ function ipKey(ip) {
   return `ucl:ip:${digest}`;
 }
 
+/** Whether Redis is available — the review log needs to know before writing. */
+export function redisAvailable() {
+  return upstashConfigured();
+}
+
+/**
+ * Run one Redis command. Exported for the review log, which needs commands this
+ * module doesn't wrap (SET/GET/ZADD). Throws if Redis isn't configured — callers
+ * decide whether that's fatal.
+ */
+export async function redisCommand(command) {
+  return upstash(command);
+}
+
 async function upstash(command) {
   const cfg = redisConfig();
   if (!cfg) throw new Error("Redis not configured");

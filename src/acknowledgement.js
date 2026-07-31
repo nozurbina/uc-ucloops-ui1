@@ -5,7 +5,11 @@
 
 // Bump the suffix if the terms change materially — every visitor is then asked
 // again, which is the point.
-export const ACK_STORAGE_KEY = "ucLoopsAckV1";
+//
+// V1 -> V2: V1 told people their conversations were never stored. V2 discloses
+// that submissions are retained for 30 days and analysed. Consent to V1 is not
+// consent to V2, so the bump is required, not housekeeping.
+export const ACK_STORAGE_KEY = "ucLoopsAckV2";
 
 export function hasAcknowledged() {
   try {
