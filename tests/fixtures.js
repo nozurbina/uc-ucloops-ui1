@@ -31,7 +31,25 @@ export const REPLY = "Six minutes, genuinely good brisket, and knowing the truck
  * off — pass SHORT_GREETING to assert the affordance stays hidden when the
  * transcript fits.
  */
-export async function stubApi(page, { greeting = LONG_GREETING, turnsMax = 15 } = {}) {
+export const ACK_STORAGE_KEY = "ucLoopsAckV1";
+
+/**
+ * Pre-accept the demo terms. Uses addInitScript so the key is in place before the
+ * app's first render, which reads it synchronously — setting it after goto would be
+ * too late and the gate would still show.
+ */
+export async function acceptTerms(page) {
+  await page.addInitScript(
+    (key) => window.localStorage.setItem(key, "1"),
+    ACK_STORAGE_KEY,
+  );
+}
+
+export async function stubApi(page, { greeting = LONG_GREETING, turnsMax = 15, ack = true } = {}) {
+  // Most tests are about something behind the consent screen, so accept by default
+  // and let the acknowledgement specs opt out.
+  if (ack) await acceptTerms(page);
+
   // The gate is a deployment concern, not something these tests exercise.
   await page.route("**/api/auth", (route) =>
     route.fulfill({

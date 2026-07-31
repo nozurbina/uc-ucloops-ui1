@@ -13,6 +13,8 @@ import { skillsForAgent, groupedSkillsForAgent, WORKFLOW_CHAIN } from "./skills.
 import { startersForAgent } from "./starters.js";
 import { COURSES_URL } from "./links.js";
 import ContactEmail from "./ContactEmail.jsx";
+import AcknowledgementGate from "./AcknowledgementGate.jsx";
+import { hasAcknowledged } from "./acknowledgement.js";
 import WorkflowDiagram from "./WorkflowDiagram.jsx";
 
 const MAX_FILES = 3;
@@ -360,6 +362,9 @@ function PasswordGate({ onUnlock }) {
 
 export default function AgentChat() {
   const [gate, setGate] = useState({ checked: false, locked: false });
+  // Read synchronously on first render so an already-consenting visitor never sees
+  // the notice flash before it disappears.
+  const [acknowledged, setAcknowledged] = useState(hasAcknowledged);
   // Read once on mount. A deep link names the agent; without one we start on the
   // overview, so `activeId` is only a fallback for when the user picks nothing.
   const [deepLinked] = useState(readAgentFromUrl);
@@ -537,6 +542,9 @@ export default function AgentChat() {
   useEffect(() => {
     // Wait for the gate check — priming while locked would just burn a 401.
     if (!gate.checked || gate.locked) return;
+    // Consent gates the very first request too: the priming turn sends this
+    // persona's whole system prompt to Anthropic, so it must not fire beforehand.
+    if (!acknowledged) return;
     // On the overview no agent has been chosen yet. Priming here would spend a
     // real API call on a persona the visitor may never open.
     if (landing) return;
@@ -546,7 +554,16 @@ export default function AgentChat() {
     if (convo.initialized || convo.initializing || initStarted.current.has(activeId)) return;
     initStarted.current.add(activeId);
     runInitialize(activeId);
-  }, [activeId, convo.initialized, convo.initializing, gate.checked, gate.locked, demoCap, landing]);
+  }, [
+    activeId,
+    convo.initialized,
+    convo.initializing,
+    gate.checked,
+    gate.locked,
+    demoCap,
+    landing,
+    acknowledged,
+  ]);
 
   async function runInitialize(agentId) {
     setConvos((prev) => ({ ...prev, [agentId]: { ...prev[agentId], initializing: true } }));
@@ -866,6 +883,12 @@ export default function AgentChat() {
         }}
       />
     );
+  }
+
+  // After the password, before the app: consent has to precede the priming turn,
+  // which is the first thing to send content to Anthropic.
+  if (!acknowledged) {
+    return <AcknowledgementGate onAccept={() => setAcknowledged(true)} />;
   }
 
   return (
